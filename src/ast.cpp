@@ -24,6 +24,8 @@ namespace fluent
 {
 namespace ast
 {
+template<class> inline constexpr bool always_false_v = false;
+
 std::ostream& operator<< (std::ostream& out, const VariableReference &var)
 {
     return out << "{ $" << var.variable << " }";
@@ -54,20 +56,23 @@ std::ostream& operator<< (std::ostream& out, const Variable &var)
     std::visit([&out](auto&& arg) { out << arg; }, var);
     return out;
 }
+                
 
-std::string Message::format(std::map<std::string, Variable> &&args)
+const std::string Message::format(const std::map<std::string, Variable> &args) const
 {
     std::stringstream values;
-    for (PatternElement &elem : this->pattern)
+    for (const PatternElement &elem : this->pattern)
     {
-        std::visit([&values, &args](auto&& arg) {
+        std::visit([&values, &args](const auto &arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>)
                 values << arg;
             else if constexpr (std::is_same_v<T, StringLiteral>)
                 values << arg.value;
             else if constexpr (std::is_same_v<T, VariableReference>)
-                values << args[arg.variable];
+                values << args.at(arg.variable);
+            else
+                static_assert(always_false_v<T>, "non-exhaustive visitor!");
         }, elem);
     }
     return values.str();

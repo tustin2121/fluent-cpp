@@ -53,8 +53,8 @@ struct StringLiteral
     StringLiteral(std::string &&value): value(std::move(value)) {}
 };
 
-using PatternElement = std::variant<std::string, StringLiteral, VariableReference>;
-using Variable = std::variant<std::string>;
+typedef std::variant<std::string, StringLiteral, VariableReference> PatternElement;
+typedef std::variant<std::string> Variable;
 
 class Message
 {
@@ -63,8 +63,9 @@ private:
     std::vector<PatternElement> pattern;
 
 public:
+    inline const std::string & getId() const { return this->id; }
     Message(std::string &&id, std::vector<PatternElement> &&pattern): id(std::move(id)), pattern(std::move(pattern)) {}
-    std::string format(std::map<std::string, Variable> &&args);
+    const std::string format(const std::map<std::string, Variable> &args) const;
 
     friend std::ostream& operator<< (std::ostream &out, const fluent::ast::Message &message);
 };
