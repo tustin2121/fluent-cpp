@@ -22,26 +22,23 @@
 
 #include <lexy/callback.hpp>
 #include <lexy/dsl.hpp>
-#include <string>
-#include <vector>
-#include <optional>
-#include <variant>
 #include <map>
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 #ifdef TEST
 #include <boost/property_tree/ptree.hpp>
 #endif
 
 #include <iostream>
 
-namespace fluent
-{
-namespace ast
-{
-struct VariableReference
-{
+namespace fluent {
+namespace ast {
+struct VariableReference {
     std::string variable;
 
-    VariableReference(std::string &&variable): variable(std::move(variable)) {}
+    VariableReference(std::string &&variable) : variable(std::move(variable)) {}
 };
 
 /**
@@ -49,53 +46,50 @@ struct VariableReference
  *
  * E.g. { "{" }
  */
-struct StringLiteral
-{
+struct StringLiteral {
     std::string value;
 
-    StringLiteral(std::string &&value): value(std::move(value)) {}
+    StringLiteral(std::string &&value) : value(std::move(value)) {}
 };
 
 typedef std::variant<std::string, StringLiteral, VariableReference> PatternElement;
 typedef std::variant<std::string> Variable;
 
-struct Comment
-{
+struct Comment {
     std::string value;
 
-    Comment(std::string &&value): value(std::move(value)) {}
+    Comment(std::string &&value) : value(std::move(value)) {}
 };
 
-struct Junk
-{
+struct Junk {
     std::string value;
 
-    Junk(std::string &&value): value(std::move(value)) {}
+    Junk(std::string &&value) : value(std::move(value)) {}
 };
 
-// FIXME: Preceeding Comments should be included as an attribute of the message 
-class Message
-{
-private:
+// FIXME: Preceeding Comments should be included as an attribute of the message
+class Message {
+  private:
     std::string id;
     std::vector<PatternElement> pattern;
 
-public:
+  public:
 #ifdef TEST
     boost::property_tree::ptree getPropertyTree() const;
 #endif
 
-    inline const std::string & getId() const { return this->id; }
-    Message(std::string &&id, std::vector<PatternElement> &&pattern): id(std::move(id)), pattern(std::move(pattern)) {}
+    inline const std::string &getId() const { return this->id; }
+    Message(std::string &&id, std::vector<PatternElement> &&pattern)
+        : id(std::move(id)), pattern(std::move(pattern)) {}
     const std::string format(const std::map<std::string, Variable> &args) const;
 
-    friend std::ostream& operator<< (std::ostream &out, const fluent::ast::Message &message);
+    friend std::ostream &operator<<(std::ostream &out,
+                                    const fluent::ast::Message &message);
 };
 
 typedef std::variant<Comment, Message, Junk> Entry;
 
 } // namespace ast
 } // namespace fluent
-
 
 #endif // FLUENT_HPP_INCLUDED

@@ -1,0 +1,6 @@
+clang-format:
+  image: hadolint/hadolint:latest-debian
+  stage: lint
+  needs: []
+  script:
+    - clang-format -n -Werror include/*.hpp src/*.cpp tests/*.cpp

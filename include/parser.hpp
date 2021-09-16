@@ -20,22 +20,20 @@
 #ifndef PARSER_HPP_INCLUDED
 #define PARSER_HPP_INCLUDED
 
+#include "ast.hpp"
 #include <lexy/callback.hpp>
 #include <lexy/dsl.hpp>
-#include <string>
-#include <vector>
-#include <optional>
-#include <variant>
 #include <map>
-#include "ast.hpp"
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 
-namespace fluent
-{
-    // TODO: parse_pattern for parsing individual message patterns
+namespace fluent {
+// TODO: parse_pattern for parsing individual message patterns
 
-    // Fixme: return a map instead of a vector
-    std::vector<ast::Entry> parse(const char* filename);
-}
-
+// Fixme: return a map instead of a vector
+std::vector<ast::Entry> parse(const char *filename);
+} // namespace fluent
 
 #endif // PARSER_HPP_INCLUDED

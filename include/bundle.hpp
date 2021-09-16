@@ -20,30 +20,29 @@
 #ifndef BUNDLE_HPP_INCLUDED
 #define BUNDLE_HPP_INCLUDED
 
-#include <string>
-#include <unordered_map>
-#include <optional>
-#include <unicode/locid.h>
 #include <filesystem>
+#include <optional>
+#include <string>
+#include <unicode/locid.h>
+#include <unordered_map>
 
 #include "ast.hpp"
 
-namespace fluent
-{
-class FluentBundle
-{
-private:
+namespace fluent {
+class FluentBundle {
+  private:
     /// Mapping of Locale identifiers to mappings of message identifiers to messages
-    std::unordered_map<std::string, std::unordered_map<std::string, fluent::ast::Message>> data;
+    std::unordered_map<std::string,
+                       std::unordered_map<std::string, fluent::ast::Message>>
+        data;
     void addResource(const icu::Locale locId, const std::filesystem::path &ftlpath);
-public:
+
+  public:
     void addDirectory(const std::string &dir);
-    
-    std::optional<std::string> formatMsg(
-        const std::vector<icu::Locale> &locIdFallback,
-        const std::string &resId,
-        const std::map<std::string, fluent::ast::Variable> &args
-    ) const;
+
+    std::optional<std::string>
+    formatMsg(const std::vector<icu::Locale> &locIdFallback, const std::string &resId,
+              const std::map<std::string, fluent::ast::Variable> &args) const;
 };
 
 } // namespace fluent

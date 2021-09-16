@@ -17,33 +17,27 @@
  *  along with fluent-cpp.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <sstream>
 #include "ast.hpp"
+#include <sstream>
 
-namespace fluent
-{
-namespace ast
-{
-template<class> inline constexpr bool always_false_v = false;
+namespace fluent {
+namespace ast {
+template <class> inline constexpr bool always_false_v = false;
 
-std::ostream& operator<< (std::ostream& out, const VariableReference &var)
-{
+std::ostream &operator<<(std::ostream &out, const VariableReference &var) {
     return out << "{ $" << var.variable << " }";
 }
 
-std::ostream& operator<< (std::ostream& out, const StringLiteral &literal)
-{
+std::ostream &operator<<(std::ostream &out, const StringLiteral &literal) {
     return out << "{ \"" << literal.value << "\" }";
 }
 
-std::ostream& operator<< (std::ostream& out, const PatternElement &elem)
-{
-    std::visit([&out](auto&& arg) { out << arg; }, elem);
+std::ostream &operator<<(std::ostream &out, const PatternElement &elem) {
+    std::visit([&out](auto &&arg) { out << arg; }, elem);
     return out;
 }
 
-std::ostream& operator<< (std::ostream& out, const Message &message)
-{
+std::ostream &operator<<(std::ostream &out, const Message &message) {
     out << message.id << " = ";
     for (fluent::ast::PatternElement value : message.pattern)
         out << value;
@@ -51,29 +45,27 @@ std::ostream& operator<< (std::ostream& out, const Message &message)
     return out;
 }
 
-std::ostream& operator<< (std::ostream& out, const Variable &var)
-{
-    std::visit([&out](auto&& arg) { out << arg; }, var);
+std::ostream &operator<<(std::ostream &out, const Variable &var) {
+    std::visit([&out](auto &&arg) { out << arg; }, var);
     return out;
 }
-                
 
-const std::string Message::format(const std::map<std::string, Variable> &args) const
-{
+const std::string Message::format(const std::map<std::string, Variable> &args) const {
     std::stringstream values;
-    for (const PatternElement &elem : this->pattern)
-    {
-        std::visit([&values, &args](const auto &arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>)
-                values << arg;
-            else if constexpr (std::is_same_v<T, StringLiteral>)
-                values << arg.value;
-            else if constexpr (std::is_same_v<T, VariableReference>)
-                values << args.at(arg.variable);
-            else
-                static_assert(always_false_v<T>, "non-exhaustive visitor!");
-        }, elem);
+    for (const PatternElement &elem : this->pattern) {
+        std::visit(
+            [&values, &args](const auto &arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>)
+                    values << arg;
+                else if constexpr (std::is_same_v<T, StringLiteral>)
+                    values << arg.value;
+                else if constexpr (std::is_same_v<T, VariableReference>)
+                    values << args.at(arg.variable);
+                else
+                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
+            },
+            elem);
     }
     return values.str();
 }
@@ -81,48 +73,42 @@ const std::string Message::format(const std::map<std::string, Variable> &args) c
 #ifdef TEST
 namespace pt = boost::property_tree;
 
-boost::property_tree::ptree Message::getPropertyTree() const
-{
+boost::property_tree::ptree Message::getPropertyTree() const {
     pt::ptree message, identifier, value, elements;
     message.put("type", "Message");
     identifier.put("type", "Identifier");
     identifier.put("name", this->id);
     message.add_child("id", identifier);
     value.put("type", "Pattern");
-    for (const PatternElement &elem: this->pattern)
-    {
-        std::visit([&value, &elements](const auto &arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>)
-            {
-                pt::ptree textElem;
-                textElem.put("type", "TextElement");
-                textElem.put("value", arg);
-                elements.push_back(std::make_pair("", textElem));
-            }
-            else if constexpr (std::is_same_v<T, StringLiteral>)
-            {
-                pt::ptree stringElem, expression;
-                stringElem.put("type", "Placeable");
-                expression.put("value", arg.value);
-                expression.put("type", "StringLiteral");
-                stringElem.add_child("expression", expression);
-                elements.push_back(std::make_pair("", stringElem));
-            }
-            else if constexpr (std::is_same_v<T, VariableReference>)
-            {
-                pt::ptree varElem, expression, id;
-                varElem.put("type", "Placeable");
-                expression.put("type", "VariableReference");
-                id.put("type", "Identifier");
-                id.put("name", arg.variable);
-                expression.add_child("id", id);
-                varElem.add_child("expression", expression);
-                elements.push_back(std::make_pair("", varElem));
-            }
-            else
-                static_assert(always_false_v<T>, "non-exhaustive visitor!");
-        }, elem);
+    for (const PatternElement &elem : this->pattern) {
+        std::visit(
+            [&value, &elements](const auto &arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    pt::ptree textElem;
+                    textElem.put("type", "TextElement");
+                    textElem.put("value", arg);
+                    elements.push_back(std::make_pair("", textElem));
+                } else if constexpr (std::is_same_v<T, StringLiteral>) {
+                    pt::ptree stringElem, expression;
+                    stringElem.put("type", "Placeable");
+                    expression.put("value", arg.value);
+                    expression.put("type", "StringLiteral");
+                    stringElem.add_child("expression", expression);
+                    elements.push_back(std::make_pair("", stringElem));
+                } else if constexpr (std::is_same_v<T, VariableReference>) {
+                    pt::ptree varElem, expression, id;
+                    varElem.put("type", "Placeable");
+                    expression.put("type", "VariableReference");
+                    id.put("type", "Identifier");
+                    id.put("name", arg.variable);
+                    expression.add_child("id", id);
+                    varElem.add_child("expression", expression);
+                    elements.push_back(std::make_pair("", varElem));
+                } else
+                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
+            },
+            elem);
     }
     value.add_child("elements", elements);
     message.add_child("value", value);
