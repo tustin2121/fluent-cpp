@@ -60,14 +60,32 @@ static constexpr auto opt_blank = dsl::while_(blank_inline | dsl::newline);
 static constexpr auto indented_char = text_char - dsl::lit_c<'['> - dsl::lit_c<'*'> - dsl::lit_c<'.'>;
 
 // CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
-struct CommentLine
+struct CommentLine: lexy::token_production
 {
-    static constexpr auto rule =
-        (
-            dsl::lit_c<'#'> / dsl::lit<"##"> / dsl::lit<"###">
-        ) + dsl::opt(dsl::peek_not(dsl::eol) >> dsl::lit_c<' '> + dsl::list(dsl::capture(dsl::code_point - dsl::eol)))
-        + dsl::eol;
-    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+    struct CommentInner: lexy::token_production
+    {
+        static constexpr auto rule =
+            (
+                dsl::lit_c<'#'> / dsl::lit<"##"> / dsl::lit<"###">
+            ) + dsl::opt(
+                dsl::peek_not(dsl::eol) >> dsl::lit_c<' '>
+                + dsl::capture(dsl::while_(dsl::peek_not(dsl::eol) >> dsl::code_point - dsl::eol))
+            ) + dsl::newline;
+        static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+    };
+    static constexpr auto rule = dsl::p<CommentInner>;
+    static constexpr auto value = lexy::construct<ast::Comment>;
+};
+
+// Junk                ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
+// junk_line           ::= /[^\n]*/ ("\u000A" | EOF)
+static constexpr auto junk_char = dsl::code_point - dsl::newline;
+struct Junk: lexy::token_production
+{
+    static constexpr auto rule = dsl::capture(dsl::while_(junk_char) + dsl::eol + dsl::while_(dsl::peek_not(dsl::lit_c<'#'> / dsl::lit_c<'-'> / dsl::ascii::alpha / dsl::eof) >> dsl::while_(junk_char) + dsl::eol));
+    static constexpr auto value = lexy::callback<ast::Junk>(
+        [](auto text) { return ast::Junk(std::string(text.begin(), text.end())); }
+    );
 };
 
 struct Identifier: lexy::token_production
@@ -177,29 +195,28 @@ struct Message
 {
     static constexpr auto whitespace = dsl::lit_c<' '>;
     // FIXME: Add Attributes
-    static constexpr auto rule = dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern>;
+    static constexpr auto rule = dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> + dsl::newline;
     static constexpr auto value = lexy::construct<ast::Message>;
 };
 
-/*
+
 struct Entry: lexy::token_production
 {
-    static constexpr auto rule = dsl::peek(dsl::lit_c<'#'>) >> dsl::p<CommentLine> | dsl::else_ >> (dsl::p<Message> + dsl::eol);
-    static constexpr auto value = lexy::forward<ast::Message>;
-};*/
+    static constexpr auto rule = dsl::peek(dsl::lit_c<'#'>) >> dsl::p<CommentLine> | dsl::peek(dsl::p<Message>) >> dsl::p<Message> | dsl::else_ >> dsl::p<Junk>;
+    static constexpr auto value = lexy::construct<ast::Entry>;
+};
 
 struct Resource
 {
-    // FIXME: Add CommentLine as whitespace
-    //static constexpr auto ws = dsl::whitespace(blank_block);
-    static constexpr auto ws = dsl::whitespace(dsl::newline);
-    static constexpr auto rule =  dsl::list(dsl::peek_not(dsl::eof) >> ws + dsl::p<Message> + dsl::newline + ws) + dsl::eof;
-    static constexpr auto value = lexy::as_list<std::vector<ast::Message>>;
+    static constexpr auto ws = dsl::whitespace(blank_block);
+    //static constexpr auto ws = dsl::whitespace(dsl::newline);
+    static constexpr auto rule =  dsl::opt(dsl::list(dsl::peek_not(dsl::eof) >> (ws + dsl::p<Entry> + ws))) + dsl::eof;
+    static constexpr auto value = lexy::as_list<std::vector<ast::Entry>>;
 };
 
 } // namespace grammar
 
-std::vector<ast::Message> parse(const char *filename)
+std::vector<ast::Entry> parse(const char *filename)
 {
     auto file = lexy::read_file<lexy::utf8_encoding>(filename);
     if (!file)

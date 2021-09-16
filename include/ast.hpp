@@ -56,6 +56,21 @@ struct StringLiteral
 typedef std::variant<std::string, StringLiteral, VariableReference> PatternElement;
 typedef std::variant<std::string> Variable;
 
+struct Comment
+{
+    std::string value;
+
+    Comment(std::string &&value): value(std::move(value)) {}
+};
+
+struct Junk
+{
+    std::string value;
+
+    Junk(std::string &&value): value(std::move(value)) {}
+};
+
+// FIXME: Preceeding Comments should be included as an attribute of the message 
 class Message
 {
 private:
@@ -69,6 +84,8 @@ public:
 
     friend std::ostream& operator<< (std::ostream &out, const fluent::ast::Message &message);
 };
+
+typedef std::variant<Comment, Message, Junk> Entry;
 
 } // namespace ast
 } // namespace fluent

@@ -26,9 +26,24 @@ using path = std::filesystem::path;
 
 namespace fluent
 {
+template<class> inline constexpr bool always_false_v = false;
+
 void FluentBundle::addResource(const icu::Locale locId, const path &ftlpath)
 {
-    std::vector<ast::Message> messages = parse(ftlpath.c_str());
+    std::vector<ast::Entry> entries = parse(ftlpath.c_str());
+    std::vector<ast::Message> messages;
+    for (ast::Entry entry: entries)
+    {
+        std::visit([&messages](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, ast::Message>)
+                messages.push_back(arg);
+            else if constexpr (std::is_same_v<T, ast::Comment>) { }
+            else if constexpr (std::is_same_v<T, ast::Junk>) { }
+            else
+                static_assert(always_false_v<T>, "non-exhaustive visitor!");
+        }, entry);
+    }
     std::unordered_map<std::string, ast::Message> messageMap;
     for (ast::Message msg: messages)
         messageMap.insert(std::make_pair(msg.getId(), msg));

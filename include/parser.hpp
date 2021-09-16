@@ -34,7 +34,7 @@ namespace fluent
     // TODO: parse_pattern for parsing individual message patterns
 
     // Fixme: return a map instead of a vector
-    std::vector<ast::Message> parse(const char* filename);
+    std::vector<ast::Entry> parse(const char* filename);
 }
 
 
