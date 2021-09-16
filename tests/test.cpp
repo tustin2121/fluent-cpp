@@ -1,9 +1,12 @@
 #include "parser.hpp"
+#include "gtest/gtest.h"
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <filesystem>
 #include <iostream>
 
 namespace pt = boost::property_tree;
+namespace fs = std::filesystem;
 
 template <class> inline constexpr bool always_false_v = false;
 
@@ -30,16 +33,17 @@ void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {
         entry);
 }
 
-int main(int argc, char **argv) {
-    if (argc < 3) {
-        std::cerr << "usage: " << argv[0] << "<filename.ftl> <filename.json>"
-                  << std::endl;
-        return 2;
-    }
+class TestParser : public testing::TestWithParam<std::string> {};
 
-    std::vector<fluent::ast::Entry> ftl = fluent::parse(argv[1]);
+namespace boost::property_tree {
+void PrintTo(const pt::ptree &node, std::ostream *os) { pt::write_json(*os, node); }
+} // namespace boost::property_tree
+
+TEST_P(TestParser, ChecksParserOutput) {
+    fs::path inputPath(GetParam());
+    std::vector<fluent::ast::Entry> ftl = fluent::parse(GetParam().c_str());
     pt::ptree expected;
-    pt::read_json(argv[2], expected);
+    pt::read_json(inputPath.replace_extension(".json").c_str(), expected);
 
     pt::ptree actual, body;
     actual.put("type", "Resource");
@@ -47,11 +51,21 @@ int main(int argc, char **argv) {
         processEntry(body, entry);
     }
     actual.add_child("body", body);
-    if (actual != expected) {
-        std::cout << "Result:" << std::endl;
-        pt::write_json(std::cout, actual);
-        std::cout << "Expected:" << std::endl;
-        pt::write_json(std::cout, expected);
-    }
-    return actual != expected;
+    EXPECT_EQ(actual, expected);
 }
+
+static std::vector<std::string> collect_test_files() {
+    std::vector<std::string> results;
+
+    for (const auto &dirEntry : fs::recursive_directory_iterator("fixtures")) {
+        if (dirEntry.is_regular_file()) {
+            fs::path file = dirEntry.path();
+            if (file.extension() == ".ftl") {
+                results.push_back(file.string());
+            }
+        }
+    }
+    return results;
+}
+INSTANTIATE_TEST_SUITE_P(ParserTests, TestParser,
+                         testing::ValuesIn(collect_test_files()));
