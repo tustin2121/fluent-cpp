@@ -27,6 +27,9 @@
 #include <optional>
 #include <variant>
 #include <map>
+#ifdef TEST
+#include <boost/property_tree/ptree.hpp>
+#endif
 
 #include <iostream>
 
@@ -78,6 +81,10 @@ private:
     std::vector<PatternElement> pattern;
 
 public:
+#ifdef TEST
+    boost::property_tree::ptree getPropertyTree() const;
+#endif
+
     inline const std::string & getId() const { return this->id; }
     Message(std::string &&id, std::vector<PatternElement> &&pattern): id(std::move(id)), pattern(std::move(pattern)) {}
     const std::string format(const std::map<std::string, Variable> &args) const;

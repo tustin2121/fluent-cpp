@@ -78,5 +78,60 @@ const std::string Message::format(const std::map<std::string, Variable> &args) c
     return values.str();
 }
 
+#ifdef TEST
+namespace pt = boost::property_tree;
+
+boost::property_tree::ptree Message::getPropertyTree() const
+{
+    pt::ptree message, identifier, value, elements;
+    message.put("type", "Message");
+    identifier.put("type", "Identifier");
+    identifier.put("name", this->id);
+    message.add_child("id", identifier);
+    value.put("type", "Pattern");
+    for (const PatternElement &elem: this->pattern)
+    {
+        std::visit([&value, &elements](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>)
+            {
+                pt::ptree textElem;
+                textElem.put("type", "TextElement");
+                textElem.put("value", arg);
+                elements.push_back(std::make_pair("", textElem));
+            }
+            else if constexpr (std::is_same_v<T, StringLiteral>)
+            {
+                pt::ptree stringElem, expression;
+                stringElem.put("type", "Placeable");
+                expression.put("value", arg.value);
+                expression.put("type", "StringLiteral");
+                stringElem.add_child("expression", expression);
+                elements.push_back(std::make_pair("", stringElem));
+            }
+            else if constexpr (std::is_same_v<T, VariableReference>)
+            {
+                pt::ptree varElem, expression, id;
+                varElem.put("type", "Placeable");
+                expression.put("type", "VariableReference");
+                id.put("type", "Identifier");
+                id.put("name", arg.variable);
+                expression.add_child("id", id);
+                varElem.add_child("expression", expression);
+                elements.push_back(std::make_pair("", varElem));
+            }
+            else
+                static_assert(always_false_v<T>, "non-exhaustive visitor!");
+        }, elem);
+    }
+    value.add_child("elements", elements);
+    message.add_child("value", value);
+    message.put("attributes", "");
+    // FIXME: Parse comments into messages
+    message.put("comment", "null");
+    return message;
+}
+#endif
+
 } // namespace ast
 } // namespace fluent
