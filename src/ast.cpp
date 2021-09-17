@@ -50,6 +50,62 @@ std::ostream &operator<<(std::ostream &out, const Variable &var) {
     return out;
 }
 
+// Text elements should be stripped to remove leading and trailing whitespace on each line
+std::string strip(const std::string& str,const std::string& ws = " \r\n") {
+    const auto begin = str.find_first_not_of(ws);
+    if (begin == std::string::npos)
+        return ""; 
+    const auto end = str.find_last_not_of(ws);
+
+    return str.substr(begin, end - begin + 1);
+}
+
+Message::Message(std::optional<std::string> &&comment, std::string &&id,
+                 std::vector<PatternElement> &&pattern)
+    : comment(std::move(comment)), id(std::move(id)) {
+    bool lastString = false;
+    std::string last;
+    for (ast::PatternElement elem : pattern) {
+        std::visit(
+            [&elem, this, &lastString, &last](const auto &arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>)
+                {
+                    // If the previous element was a string, merge with it
+                    last += arg;
+                    if (!lastString) {
+                        lastString = true;
+                        last = arg;
+                    }
+                }
+                else if constexpr (std::is_same_v<T, StringLiteral>)
+                {
+                    if (lastString) {
+                        this->pattern.push_back(PatternElement(strip(last)));
+                        last = std::string();
+                        lastString = false;
+                    }
+                    this->pattern.push_back(elem);
+                }
+                else if constexpr (std::is_same_v<T, VariableReference>)
+                {
+                    if (lastString) {
+                        this->pattern.push_back(PatternElement(strip(last)));
+                        last = std::string();
+                        lastString = false;
+                    }
+                    this->pattern.push_back(elem);
+                }
+                else
+                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
+            },
+            elem);
+    }
+    if (lastString) {
+        this->pattern.push_back(PatternElement(strip(last)));
+    }
+}
+
 const std::string Message::format(const std::map<std::string, Variable> &args) const {
     std::stringstream values;
     for (const PatternElement &elem : this->pattern) {
