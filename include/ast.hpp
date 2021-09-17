@@ -70,6 +70,7 @@ struct Junk {
 // FIXME: Preceeding Comments should be included as an attribute of the message
 class Message {
   private:
+    std::optional<std::string> comment;
     std::string id;
     std::vector<PatternElement> pattern;
 
@@ -79,8 +80,8 @@ class Message {
 #endif
 
     inline const std::string &getId() const { return this->id; }
-    Message(std::string &&id, std::vector<PatternElement> &&pattern)
-        : id(std::move(id)), pattern(std::move(pattern)) {}
+    Message(std::optional<std::string> &&comment, std::string &&id, std::vector<PatternElement> &&pattern)
+        : comment(std::move(comment)), id(std::move(id)), pattern(std::move(pattern)) {}
     const std::string format(const std::map<std::string, Variable> &args) const;
 
     friend std::ostream &operator<<(std::ostream &out,

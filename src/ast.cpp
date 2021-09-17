@@ -74,7 +74,7 @@ const std::string Message::format(const std::map<std::string, Variable> &args) c
 namespace pt = boost::property_tree;
 
 boost::property_tree::ptree Message::getPropertyTree() const {
-    pt::ptree message, identifier, value, elements;
+    pt::ptree message, identifier, comment, value, elements;
     message.put("type", "Message");
     identifier.put("type", "Identifier");
     identifier.put("name", this->id);
@@ -113,8 +113,13 @@ boost::property_tree::ptree Message::getPropertyTree() const {
     value.add_child("elements", elements);
     message.add_child("value", value);
     message.put("attributes", "");
-    // FIXME: Parse comments into messages
-    message.put("comment", "null");
+    if (this->comment) {
+        comment.put("type", "Comment");
+        comment.put("content", *this->comment);
+        message.add_child("comment", comment);
+    } else {
+        message.put("comment", "null");
+    }
     return message;
 }
 #endif

@@ -78,6 +78,17 @@ struct CommentLine : lexy::token_production {
     static constexpr auto value = lexy::construct<ast::Comment>;
 };
 
+struct MessageComment : lexy::token_production {
+    static constexpr auto rule =
+        dsl::lit_c<'#'> +
+        dsl::opt(dsl::peek_not(dsl::eol) >>
+                 dsl::lit_c<' '> +
+                     dsl::capture(dsl::while_(dsl::peek_not(dsl::eol) >>
+                                              dsl::code_point - dsl::eol))) +
+        dsl::newline;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+};
+
 // Junk                ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
 // junk_line           ::= /[^\n]*/ ("\u000A" | EOF)
 static constexpr auto junk_char = dsl::code_point - dsl::newline;
@@ -190,14 +201,15 @@ struct Message {
     static constexpr auto whitespace = dsl::lit_c<' '>;
     // FIXME: Add Attributes
     static constexpr auto rule =
+        dsl::opt(dsl::peek(dsl::lit_c<'#'>) >> dsl::p<MessageComment>) +
         dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> + dsl::newline;
     static constexpr auto value = lexy::construct<ast::Message>;
 };
 
 struct Entry : lexy::token_production {
     static constexpr auto rule =
-        dsl::peek(dsl::lit_c<'#'>) >> dsl::p<CommentLine> |
-        dsl::peek(dsl::p<Message>) >> dsl::p<Message> | dsl::else_ >> dsl::p<Junk>;
+        dsl::peek(dsl::p<Message>) >> dsl::p<Message> |
+        dsl::peek(dsl::lit_c<'#'>) >> dsl::p<CommentLine> | dsl::else_ >> dsl::p<Junk>;
     static constexpr auto value = lexy::construct<ast::Entry>;
 };
 
