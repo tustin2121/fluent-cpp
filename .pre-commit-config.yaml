@@ -9,7 +9,7 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
       - id: sort-simple-yaml
-  - repo: https://github.com/pocc/pre-commit-hooks
-    rev: v1.3.4
+  - repo: https://github.com/doublify/pre-commit-clang-format
+    rev: 62302476d0da01515660132d76902359bed0f782
     hooks:
       - id: clang-format
