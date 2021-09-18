@@ -67,9 +67,8 @@ struct Junk {
     Junk(std::string &&value) : value(std::move(value)) {}
 };
 
-// FIXME: Preceeding Comments should be included as an attribute of the message
 class Message {
-  private:
+  protected:
     std::optional<std::string> comment;
     std::string id;
     std::vector<PatternElement> pattern;
@@ -88,7 +87,16 @@ class Message {
                                     const fluent::ast::Message &message);
 };
 
-typedef std::variant<Comment, Message, Junk> Entry;
+class Term : public Message {
+    using Message::Message;
+
+  public:
+#ifdef TEST
+    boost::property_tree::ptree getPropertyTree() const;
+#endif
+};
+
+typedef std::variant<Comment, Message, Term, Junk> Entry;
 
 } // namespace ast
 } // namespace fluent

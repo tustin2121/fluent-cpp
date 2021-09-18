@@ -35,6 +35,8 @@ void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, fluent::ast::Message>) {
                 parent.push_back(std::make_pair("", arg.getPropertyTree()));
+            } else if constexpr (std::is_same_v<T, fluent::ast::Term>) {
+                parent.push_back(std::make_pair("", arg.getPropertyTree()));
             } else if constexpr (std::is_same_v<T, fluent::ast::Comment>) {
                 pt::ptree comment;
                 comment.put("type", "Comment");

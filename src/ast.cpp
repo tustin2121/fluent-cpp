@@ -125,16 +125,12 @@ const std::string Message::format(const std::map<std::string, Variable> &args) c
 #ifdef TEST
 namespace pt = boost::property_tree;
 
-boost::property_tree::ptree Message::getPropertyTree() const {
-    pt::ptree message, identifier, comment, value, elements;
-    message.put("type", "Message");
-    identifier.put("type", "Identifier");
-    identifier.put("name", this->id);
-    message.add_child("id", identifier);
+pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
+    pt::ptree value, elements;
     value.put("type", "Pattern");
-    for (const PatternElement &elem : this->pattern) {
+    for (const PatternElement &elem : pattern) {
         std::visit(
-            [&value, &elements](const auto &arg) {
+            [&elements](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>) {
                     pt::ptree textElem;
@@ -163,7 +159,34 @@ boost::property_tree::ptree Message::getPropertyTree() const {
             elem);
     }
     value.add_child("elements", elements);
-    message.add_child("value", value);
+    return value;
+}
+
+boost::property_tree::ptree Message::getPropertyTree() const {
+    pt::ptree message, identifier, comment, value, elements;
+    message.put("type", "Message");
+    identifier.put("type", "Identifier");
+    identifier.put("name", this->id);
+    message.add_child("id", identifier);
+    message.add_child("value", getPatternPropertyTree(this->pattern));
+    message.put("attributes", "");
+    if (this->comment) {
+        comment.put("type", "Comment");
+        comment.put("content", *this->comment);
+        message.add_child("comment", comment);
+    } else {
+        message.put("comment", "null");
+    }
+    return message;
+}
+
+boost::property_tree::ptree Term::getPropertyTree() const {
+    pt::ptree message, identifier, comment, value, elements;
+    message.put("type", "Term");
+    identifier.put("type", "Identifier");
+    identifier.put("name", this->id);
+    message.add_child("id", identifier);
+    message.add_child("value", getPatternPropertyTree(this->pattern));
     message.put("attributes", "");
     if (this->comment) {
         comment.put("type", "Comment");

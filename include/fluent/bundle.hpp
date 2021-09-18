@@ -29,20 +29,19 @@
 #include "ast.hpp"
 
 namespace fluent {
+
 class FluentBundle {
   private:
-    /// Mapping of Locale identifiers to mappings of message identifiers to messages
-    std::unordered_map<std::string,
-                       std::unordered_map<std::string, fluent::ast::Message>>
-        data;
-    void addResource(const icu::Locale locId, const std::filesystem::path &ftlpath);
+    // Mapping of message identifiers to Messages
+    std::unordered_map<std::string, ast::Message> messages;
+    // Mapping of term identifiers to Terms
+    std::unordered_map<std::string, ast::Term> terms;
 
   public:
-    void addDirectory(const std::string &dir);
-
-    std::optional<std::string>
-    formatMsg(const std::vector<icu::Locale> &locIdFallback, const std::string &resId,
-              const std::map<std::string, fluent::ast::Variable> &args) const;
+    void addMessage(ast::Message &&message);
+    void addTerm(ast::Term &&term);
+    std::optional<ast::Message> getMessage(const std::string &identifier) const;
+    std::optional<ast::Term> getTerm(const std::string &identifier) const;
 };
 
 } // namespace fluent

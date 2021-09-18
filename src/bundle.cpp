@@ -18,63 +18,34 @@
  */
 
 #include "fluent/bundle.hpp"
-#include "fluent/parser.hpp"
-
-using recursive_directory_iterator = std::filesystem::recursive_directory_iterator;
-using directory_entry = std::filesystem::recursive_directory_iterator;
-using path = std::filesystem::path;
 
 namespace fluent {
-template <class> inline constexpr bool always_false_v = false;
 
-void FluentBundle::addResource(const icu::Locale locId, const path &ftlpath) {
-    std::vector<ast::Entry> entries = parse(ftlpath.c_str());
-    std::vector<ast::Message> messages;
-    for (ast::Entry entry : entries) {
-        std::visit(
-            [&messages](const auto &arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, ast::Message>)
-                    messages.push_back(arg);
-                else if constexpr (std::is_same_v<T, ast::Comment>) {
-                } else if constexpr (std::is_same_v<T, ast::Junk>) {
-                } else {
-                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
-                }
-            },
-            entry);
-    }
-    std::unordered_map<std::string, ast::Message> messageMap;
-    for (ast::Message msg : messages)
-        messageMap.insert(std::make_pair(msg.getId(), msg));
-    this->data.insert(std::make_pair(std::string(locId.getName()), messageMap));
+void FluentBundle::addMessage(ast::Message &&message) {
+    this->messages.insert(std::make_pair(message.getId(), message));
 }
 
-void FluentBundle::addDirectory(const std::string &dir) {
-    for (const auto &dirEntry : recursive_directory_iterator(dir)) {
-        if (dirEntry.is_regular_file()) {
-            path file = dirEntry.path();
-            if (file.extension() == ".ftl") {
-                icu::Locale locId =
-                    icu::Locale::createFromName(file.parent_path().stem().c_str());
-                this->addResource(locId, file);
-            }
-        }
+void FluentBundle::addTerm(ast::Term &&term) {
+    this->terms.insert(std::make_pair(term.getId(), term));
+}
+
+std::optional<ast::Message>
+FluentBundle::getMessage(const std::string &identifier) const {
+    auto result = this->messages.find(identifier);
+    if (result != this->messages.end()) {
+        return std::optional(result->second);
+    } else {
+        return std::optional<ast::Message>();
     }
 }
 
-std::optional<std::string> FluentBundle::formatMsg(
-    const std::vector<icu::Locale> &locIdFallback, const std::string &resId,
-    const std::map<std::string, fluent::ast::Variable> &args) const {
-    for (icu::Locale locId : locIdFallback) {
-        auto result = this->data.find(std::string(locId.getName()));
-        if (result != this->data.end()) {
-            auto innerResult = result->second.find(resId);
-            if (innerResult != result->second.end())
-                return std::optional(innerResult->second.format(std::move(args)));
-        }
+std::optional<ast::Term> FluentBundle::getTerm(const std::string &identifier) const {
+    auto result = this->terms.find(identifier);
+    if (result != this->terms.end()) {
+        return std::optional(result->second);
+    } else {
+        return std::optional<ast::Term>();
     }
-    return std::optional<std::string>();
 }
 
 } // namespace fluent
