@@ -80,7 +80,8 @@ class Message {
 #endif
 
     inline const std::string &getId() const { return this->id; }
-    Message(std::optional<std::string> &&comment, std::string &&id, std::vector<PatternElement> &&pattern);
+    Message(std::optional<std::string> &&comment, std::string &&id,
+            std::vector<PatternElement> &&pattern);
     const std::string format(const std::map<std::string, Variable> &args) const;
 
     friend std::ostream &operator<<(std::ostream &out,

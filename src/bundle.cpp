@@ -38,8 +38,9 @@ void FluentBundle::addResource(const icu::Locale locId, const path &ftlpath) {
                     messages.push_back(arg);
                 else if constexpr (std::is_same_v<T, ast::Comment>) {
                 } else if constexpr (std::is_same_v<T, ast::Junk>) {
-                } else
+                } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                }
             },
             entry);
     }

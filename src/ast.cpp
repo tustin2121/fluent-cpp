@@ -18,6 +18,7 @@
  */
 
 #include "fluent/ast.hpp"
+
 #include <sstream>
 
 namespace fluent {
@@ -50,11 +51,12 @@ std::ostream &operator<<(std::ostream &out, const Variable &var) {
     return out;
 }
 
-// Text elements should be stripped to remove leading and trailing whitespace on each line
-std::string strip(const std::string& str,const std::string& ws = " \r\n") {
+// Text elements should be stripped to remove leading and trailing whitespace on
+// each line
+std::string strip(const std::string &str, const std::string &ws = " \r\n") {
     const auto begin = str.find_first_not_of(ws);
     if (begin == std::string::npos)
-        return ""; 
+        return "";
     const auto end = str.find_last_not_of(ws);
 
     return str.substr(begin, end - begin + 1);
@@ -69,34 +71,28 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
         std::visit(
             [&elem, this, &lastString, &last](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, std::string>)
-                {
+                if constexpr (std::is_same_v<T, std::string>) {
                     // If the previous element was a string, merge with it
                     last += arg;
                     if (!lastString) {
                         lastString = true;
                         last = arg;
                     }
-                }
-                else if constexpr (std::is_same_v<T, StringLiteral>)
-                {
+                } else if constexpr (std::is_same_v<T, StringLiteral>) {
                     if (lastString) {
                         this->pattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
                     this->pattern.push_back(elem);
-                }
-                else if constexpr (std::is_same_v<T, VariableReference>)
-                {
+                } else if constexpr (std::is_same_v<T, VariableReference>) {
                     if (lastString) {
                         this->pattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
                     this->pattern.push_back(elem);
-                }
-                else
+                } else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
             elem);

@@ -16,8 +16,8 @@ FetchContent_MakeAvailable(lexy)
 include_directories(include)
 
 set(FLUENT_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/parser.cpp 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ast.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/parser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ast.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bundle.cpp
 )
 add_library(fluent ${FLUENT_SOURCES})
