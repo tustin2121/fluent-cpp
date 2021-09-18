@@ -17,8 +17,8 @@
  *  along with fluent-cpp.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "bundle.hpp"
-#include "parser.hpp"
+#include "fluent/bundle.hpp"
+#include "fluent/parser.hpp"
 
 using recursive_directory_iterator = std::filesystem::recursive_directory_iterator;
 using directory_entry = std::filesystem::recursive_directory_iterator;

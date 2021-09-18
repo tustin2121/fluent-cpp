@@ -17,7 +17,7 @@
  *  along with fluent-cpp.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ast.hpp"
+#include "fluent/ast.hpp"
 #include <sstream>
 
 namespace fluent {
