@@ -26,7 +26,15 @@ namespace ast {
 template <class> inline constexpr bool always_false_v = false;
 
 std::ostream &operator<<(std::ostream &out, const VariableReference &var) {
-    return out << "{ $" << var.variable << " }";
+    return out << "{ $" << var.identifier << " }";
+}
+
+std::ostream &operator<<(std::ostream &out, const MessageReference &var) {
+    return out << "{ " << var.identifier << " }";
+}
+
+std::ostream &operator<<(std::ostream &out, const TermReference &var) {
+    return out << "{ -" << var.identifier << " }";
 }
 
 std::ostream &operator<<(std::ostream &out, const StringLiteral &literal) {
@@ -92,6 +100,20 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
                         lastString = false;
                     }
                     this->pattern.push_back(elem);
+                } else if constexpr (std::is_same_v<T, MessageReference>) {
+                    if (lastString) {
+                        this->pattern.push_back(PatternElement(strip(last)));
+                        last = std::string();
+                        lastString = false;
+                    }
+                    this->pattern.push_back(elem);
+                } else if constexpr (std::is_same_v<T, TermReference>) {
+                    if (lastString) {
+                        this->pattern.push_back(PatternElement(strip(last)));
+                        last = std::string();
+                        lastString = false;
+                    }
+                    this->pattern.push_back(elem);
                 } else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
@@ -102,18 +124,27 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
     }
 }
 
-const std::string Message::format(const std::map<std::string, Variable> &args) const {
+const std::string
+Message::format(const std::map<std::string, Variable> &args,
+                const std::function<Message(std::string)> &messageLookup,
+                const std::function<Term(std::string)> &termLookup) const {
     std::stringstream values;
     for (const PatternElement &elem : this->pattern) {
         std::visit(
-            [&values, &args](const auto &arg) {
+            [&values, &args, &messageLookup, &termLookup](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>)
                     values << arg;
                 else if constexpr (std::is_same_v<T, StringLiteral>)
                     values << arg.value;
-                else if constexpr (std::is_same_v<T, VariableReference>)
-                    values << args.at(arg.variable);
+                else if constexpr (std::is_same_v<T, MessageReference>) {
+                    values << messageLookup(arg.identifier)
+                                  .format({}, messageLookup, termLookup);
+                } else if constexpr (std::is_same_v<T, TermReference>) {
+                    values << termLookup(arg.identifier)
+                                  .format({}, messageLookup, termLookup);
+                } else if constexpr (std::is_same_v<T, VariableReference>)
+                    values << args.at(arg.identifier);
                 else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
@@ -149,7 +180,25 @@ pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
                     varElem.put("type", "Placeable");
                     expression.put("type", "VariableReference");
                     id.put("type", "Identifier");
-                    id.put("name", arg.variable);
+                    id.put("name", arg.identifier);
+                    expression.add_child("id", id);
+                    varElem.add_child("expression", expression);
+                    elements.push_back(std::make_pair("", varElem));
+                } else if constexpr (std::is_same_v<T, MessageReference>) {
+                    pt::ptree varElem, expression, id;
+                    varElem.put("type", "Placeable");
+                    expression.put("type", "MessageReference");
+                    id.put("type", "Identifier");
+                    id.put("name", arg.identifier);
+                    expression.add_child("id", id);
+                    varElem.add_child("expression", expression);
+                    elements.push_back(std::make_pair("", varElem));
+                } else if constexpr (std::is_same_v<T, TermReference>) {
+                    pt::ptree varElem, expression, id;
+                    varElem.put("type", "Placeable");
+                    expression.put("type", "TermReference");
+                    id.put("type", "Identifier");
+                    id.put("name", arg.identifier);
                     expression.add_child("id", id);
                     varElem.add_child("expression", expression);
                     elements.push_back(std::make_pair("", varElem));

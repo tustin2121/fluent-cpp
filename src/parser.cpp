@@ -141,6 +141,20 @@ struct VariableReference : lexy::token_production {
     static constexpr auto value = lexy::construct<ast::VariableReference>;
 };
 
+// MessageReference    ::= Identifier AttributeAccessor?
+struct MessageReference : lexy::token_production {
+    // FIXME: Add attribute accessors
+    static constexpr auto rule = dsl::p<Identifier>;
+    static constexpr auto value = lexy::construct<ast::MessageReference>;
+};
+
+// TermReference       ::= "-" Identifier AttributeAccessor? CallArguments?
+struct TermReference : lexy::token_production {
+    // FIXME: Add attribute accessors and arguments
+    static constexpr auto rule = dsl::lit_c<'-'> + dsl::p<Identifier>;
+    static constexpr auto value = lexy::construct<ast::TermReference>;
+};
+
 struct StringLiteral : lexy::token_production {
     struct StringLiteralInner : lexy::transparent_production {
         static constexpr auto escaped_symbols = lexy::symbol_table<char> //
@@ -167,6 +181,8 @@ struct InlineExpression {
     static constexpr auto
         rule = dsl::peek(dsl::lit_c<'"'>) >> dsl::p<StringLiteral> |
                dsl::peek(dsl::lit_c<'$'>) >> dsl::p<VariableReference> |
+               dsl::peek(dsl::lit_c<'-'>) >> dsl::p<TermReference> |
+               dsl::peek(dsl::p<Identifier>) >> dsl::p<MessageReference> |
                dsl::error<expected_expression>;
     static constexpr auto value = lexy::construct<ast::PatternElement>;
 };

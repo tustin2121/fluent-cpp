@@ -36,9 +36,18 @@
 namespace fluent {
 namespace ast {
 struct VariableReference {
-    std::string variable;
+    std::string identifier;
+    VariableReference(std::string &&identifier) : identifier(std::move(identifier)) {}
+};
 
-    VariableReference(std::string &&variable) : variable(std::move(variable)) {}
+struct MessageReference {
+    std::string identifier;
+    MessageReference(std::string &&identifier) : identifier(std::move(identifier)) {}
+};
+
+struct TermReference {
+    std::string identifier;
+    TermReference(std::string &&identifier) : identifier(std::move(identifier)) {}
 };
 
 /**
@@ -52,7 +61,9 @@ struct StringLiteral {
     StringLiteral(std::string &&value) : value(std::move(value)) {}
 };
 
-typedef std::variant<std::string, StringLiteral, VariableReference> PatternElement;
+typedef std::variant<std::string, StringLiteral, VariableReference, MessageReference,
+                     TermReference>
+    PatternElement;
 typedef std::variant<std::string> Variable;
 
 struct Comment {
@@ -67,6 +78,7 @@ struct Junk {
     Junk(std::string &&value) : value(std::move(value)) {}
 };
 
+class Term;
 class Message {
   protected:
     std::optional<std::string> comment;
@@ -81,7 +93,10 @@ class Message {
     inline const std::string &getId() const { return this->id; }
     Message(std::optional<std::string> &&comment, std::string &&id,
             std::vector<PatternElement> &&pattern);
-    const std::string format(const std::map<std::string, Variable> &args) const;
+
+    const std::string format(const std::map<std::string, Variable> &args,
+                             const std::function<Message(std::string)> &messageLookup,
+                             const std::function<Term(std::string)> &termLookup) const;
 
     friend std::ostream &operator<<(std::ostream &out,
                                     const fluent::ast::Message &message);
