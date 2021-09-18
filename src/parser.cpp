@@ -179,11 +179,19 @@ struct inline_placeable : lexy::token_production {
     static constexpr auto value = lexy::forward<ast::PatternElement>;
 };
 
+// block_placeable     ::= blank_block blank_inline? inline_placeable
+struct block_placeable : lexy::token_production {
+    static constexpr auto rule =
+        blank_block + dsl::if_(blank_inline) + dsl::p<inline_placeable>;
+    static constexpr auto value = lexy::forward<ast::PatternElement>;
+};
+
 // PatternElement      ::= inline_text | block_text | inline_placeable | block_placeable
 struct PatternElement : lexy::token_production {
     // FIXME: Add block_placeable
     static constexpr auto rule =
         dsl::peek(dsl::p<block_text>) >> dsl::p<block_text> |
+        dsl::peek(dsl::p<block_placeable>) >> dsl::p<block_placeable> |
         dsl::peek(dsl::lit_c<'{'>) >> dsl::p<inline_placeable> | dsl::p<inline_text>;
     static constexpr auto value = lexy::forward<ast::PatternElement>;
 };
