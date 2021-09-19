@@ -67,7 +67,14 @@ std::string strip(const std::string &str, const std::string &ws = " \r\n") {
         return "";
     const auto end = str.find_last_not_of(ws);
 
-    return str.substr(begin, end - begin + 1);
+    std::string stripped = str.substr(begin, end - begin + 1);
+
+    size_t pos;
+    // DOS newlines should be replaced with Unix newlines
+    while ((pos = stripped.find("\r\n")) != std::string::npos) {
+        stripped.replace(pos, 2, "\n");
+    }
+    return stripped;
 }
 
 void addPattern(std::vector<PatternElement> &&newPattern,
