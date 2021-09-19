@@ -70,14 +70,13 @@ std::string strip(const std::string &str, const std::string &ws = " \r\n") {
     return str.substr(begin, end - begin + 1);
 }
 
-Message::Message(std::optional<std::string> &&comment, std::string &&id,
-                 std::vector<PatternElement> &&pattern)
-    : comment(std::move(comment)), id(std::move(id)) {
+void addPattern(std::vector<PatternElement> &&newPattern,
+                std::vector<PatternElement> &existingPattern) {
     bool lastString = false;
     std::string last;
-    for (ast::PatternElement elem : pattern) {
+    for (ast::PatternElement elem : newPattern) {
         std::visit(
-            [&elem, this, &lastString, &last](const auto &arg) {
+            [&elem, &existingPattern, &lastString, &last](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>) {
                     // If the previous element was a string, merge with it
@@ -88,39 +87,54 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
                     }
                 } else if constexpr (std::is_same_v<T, StringLiteral>) {
                     if (lastString) {
-                        this->pattern.push_back(PatternElement(strip(last)));
+                        existingPattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
-                    this->pattern.push_back(elem);
+                    existingPattern.push_back(elem);
                 } else if constexpr (std::is_same_v<T, VariableReference>) {
                     if (lastString) {
-                        this->pattern.push_back(PatternElement(strip(last)));
+                        existingPattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
-                    this->pattern.push_back(elem);
+                    existingPattern.push_back(elem);
                 } else if constexpr (std::is_same_v<T, MessageReference>) {
                     if (lastString) {
-                        this->pattern.push_back(PatternElement(strip(last)));
+                        existingPattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
-                    this->pattern.push_back(elem);
+                    existingPattern.push_back(elem);
                 } else if constexpr (std::is_same_v<T, TermReference>) {
                     if (lastString) {
-                        this->pattern.push_back(PatternElement(strip(last)));
+                        existingPattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
-                    this->pattern.push_back(elem);
+                    existingPattern.push_back(elem);
                 } else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
             elem);
     }
     if (lastString) {
-        this->pattern.push_back(PatternElement(strip(last)));
+        existingPattern.push_back(PatternElement(strip(last)));
+    }
+}
+
+Attribute::Attribute(std::string &&id, std::vector<PatternElement> &&pattern)
+    : id(std::move(id)) {
+    addPattern(std::move(pattern), this->pattern);
+}
+
+Message::Message(std::optional<std::string> &&comment, std::string &&id,
+                 std::vector<PatternElement> &&pattern,
+                 std::vector<Attribute> &&attributes)
+    : comment(std::move(comment)), id(std::move(id)) {
+    addPattern(std::move(pattern), this->pattern);
+    for (ast::Attribute &attribute : attributes) {
+        this->attributes.insert(std::make_pair(attribute.getId(), attribute));
     }
 }
 
@@ -211,32 +225,33 @@ pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
     return value;
 }
 
-boost::property_tree::ptree Message::getPropertyTree() const {
-    pt::ptree message, identifier, comment, value, elements;
-    message.put("type", "Message");
+boost::property_tree::ptree Attribute::getPropertyTree() const {
+    pt::ptree root, identifier, comment, value, elements;
+    root.put("type", "Attribute");
     identifier.put("type", "Identifier");
     identifier.put("name", this->id);
-    message.add_child("id", identifier);
-    message.add_child("value", getPatternPropertyTree(this->pattern));
-    message.put("attributes", "");
-    if (this->comment) {
-        comment.put("type", "Comment");
-        comment.put("content", *this->comment);
-        message.add_child("comment", comment);
-    } else {
-        message.put("comment", "null");
-    }
-    return message;
+    root.add_child("id", identifier);
+    root.add_child("value", getPatternPropertyTree(this->pattern));
+    return root;
 }
 
-boost::property_tree::ptree Term::getPropertyTree() const {
+boost::property_tree::ptree Message::getPropertyTree() const {
     pt::ptree message, identifier, comment, value, elements;
-    message.put("type", "Term");
+    message.put("type", this->getPropertyTreeType());
     identifier.put("type", "Identifier");
     identifier.put("name", this->id);
     message.add_child("id", identifier);
     message.add_child("value", getPatternPropertyTree(this->pattern));
-    message.put("attributes", "");
+    if (this->attributes.empty()) {
+        message.put("attributes", "");
+    } else {
+        pt::ptree attributes;
+        for (auto attribute : this->attributes) {
+            attributes.push_back(
+                std::make_pair("", attribute.second.getPropertyTree()));
+        }
+        message.add_child("attributes", attributes);
+    }
     if (this->comment) {
         comment.put("type", "Comment");
         comment.put("content", *this->comment);

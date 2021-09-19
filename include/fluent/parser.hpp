@@ -20,13 +20,7 @@
 #ifndef PARSER_HPP_INCLUDED
 #define PARSER_HPP_INCLUDED
 
-#include "ast.hpp"
-#include <lexy/callback.hpp>
-#include <lexy/dsl.hpp>
-#include <map>
-#include <optional>
-#include <string>
-#include <variant>
+#include "fluent/ast.hpp"
 #include <vector>
 
 namespace fluent {

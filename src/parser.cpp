@@ -18,15 +18,19 @@
  */
 
 #include "fluent/parser.hpp"
+#include "fluent/ast.hpp"
 #include <lexy/action/parse.hpp>
 #include <lexy/action/trace.hpp>
 #include <lexy/callback.hpp>
 #include <lexy/dsl.hpp>
 #include <lexy/input/file.hpp>
 #include <lexy_ext/report_error.hpp>
+#include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #ifdef DEBUG_PARSER
@@ -219,6 +223,21 @@ struct Pattern : lexy::token_production {
     static constexpr auto value = lexy::as_list<std::vector<ast::PatternElement>>;
 };
 
+// Attribute ::= line_end blank? "." Identifier blank_inline? "=" blank_inline? Pattern
+struct Attribute : lexy::token_production {
+    static constexpr auto rule = dsl::newline + opt_blank + dsl::lit_c<'.'> +
+                                 dsl::p<Identifier> + dsl::if_(blank_inline) +
+                                 dsl::lit_c<'='> + dsl::if_(blank_inline) +
+                                 dsl::p<Pattern>;
+    static constexpr auto value = lexy::construct<ast::Attribute>;
+};
+
+struct Attributes : lexy::token_production {
+    static constexpr auto rule = dsl::opt(dsl::list(
+        dsl::peek(dsl::newline + opt_blank + dsl::lit_c<'.'>) >> dsl::p<Attribute>));
+    static constexpr auto value = lexy::as_list<std::vector<ast::Attribute>>;
+};
+
 // Term ::= "-" Identifier blank_inline? "=" blank_inline? Pattern Attribute*
 struct Term {
     static constexpr auto whitespace = dsl::lit_c<' '>;
@@ -226,7 +245,7 @@ struct Term {
     static constexpr auto rule =
         dsl::opt(dsl::peek(dsl::lit_c<'#'>) >> dsl::p<MessageComment>) +
         dsl::lit_c<'-'> + dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> +
-        dsl::newline;
+        dsl::p<Attributes> + dsl::newline;
     static constexpr auto value = lexy::construct<ast::Term>;
 };
 
@@ -237,7 +256,8 @@ struct Message {
     // FIXME: Add Attributes
     static constexpr auto rule =
         dsl::opt(dsl::peek(dsl::lit_c<'#'>) >> dsl::p<MessageComment>) +
-        dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> + dsl::newline;
+        dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> + dsl::p<Attributes> +
+        dsl::newline;
     static constexpr auto value = lexy::construct<ast::Message>;
 };
 

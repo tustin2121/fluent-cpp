@@ -20,11 +20,11 @@
 #ifndef AST_HPP_INCLUDED
 #define AST_HPP_INCLUDED
 
-#include <lexy/callback.hpp>
-#include <lexy/dsl.hpp>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 #ifdef TEST
@@ -78,10 +78,8 @@ struct Junk {
     Junk(std::string &&value) : value(std::move(value)) {}
 };
 
-class Term;
-class Message {
-  protected:
-    std::optional<std::string> comment;
+struct Attribute {
+  private:
     std::string id;
     std::vector<PatternElement> pattern;
 
@@ -91,8 +89,27 @@ class Message {
 #endif
 
     inline const std::string &getId() const { return this->id; }
+
+    Attribute(std::string &&id, std::vector<PatternElement> &&pattern);
+};
+
+class Term;
+class Message {
+  protected:
+    std::optional<std::string> comment;
+    std::string id;
+    std::vector<PatternElement> pattern;
+    std::unordered_map<std::string, Attribute> attributes;
+
+  public:
+#ifdef TEST
+    virtual std::string getPropertyTreeType() const { return "Message"; }
+    boost::property_tree::ptree getPropertyTree() const;
+#endif
+
+    inline const std::string &getId() const { return this->id; }
     Message(std::optional<std::string> &&comment, std::string &&id,
-            std::vector<PatternElement> &&pattern);
+            std::vector<PatternElement> &&pattern, std::vector<Attribute> &&attributes);
 
     const std::string format(const std::map<std::string, Variable> &args,
                              const std::function<Message(std::string)> &messageLookup,
@@ -107,7 +124,7 @@ class Term : public Message {
 
   public:
 #ifdef TEST
-    boost::property_tree::ptree getPropertyTree() const;
+    std::string getPropertyTreeType() const override { return "Term"; }
 #endif
 };
 
