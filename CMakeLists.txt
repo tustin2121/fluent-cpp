@@ -19,6 +19,7 @@ set(FLUENT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/parser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ast.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bundle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/loader.cpp
 )
 add_library(fluent ${FLUENT_SOURCES})
 target_link_libraries(fluent foonathan::lexy ${ICU_LIBRARIES})

@@ -111,9 +111,10 @@ class Message {
     Message(std::optional<std::string> &&comment, std::string &&id,
             std::vector<PatternElement> &&pattern, std::vector<Attribute> &&attributes);
 
-    const std::string format(const std::map<std::string, Variable> &args,
-                             const std::function<Message(std::string)> &messageLookup,
-                             const std::function<Term(std::string)> &termLookup) const;
+    const std::string format(
+        const std::map<std::string, Variable> &args,
+        const std::function<std::optional<Message>(const std::string &)> messageLookup,
+        const std::function<std::optional<Term>(const std::string &)> termLookup) const;
 
     friend std::ostream &operator<<(std::ostream &out,
                                     const fluent::ast::Message &message);

@@ -138,10 +138,10 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
     }
 }
 
-const std::string
-Message::format(const std::map<std::string, Variable> &args,
-                const std::function<Message(std::string)> &messageLookup,
-                const std::function<Term(std::string)> &termLookup) const {
+const std::string Message::format(
+    const std::map<std::string, Variable> &args,
+    const std::function<std::optional<Message>(const std::string &)> messageLookup,
+    const std::function<std::optional<Term>(const std::string &)> termLookup) const {
     std::stringstream values;
     for (const PatternElement &elem : this->pattern) {
         std::visit(
@@ -152,11 +152,21 @@ Message::format(const std::map<std::string, Variable> &args,
                 else if constexpr (std::is_same_v<T, StringLiteral>)
                     values << arg.value;
                 else if constexpr (std::is_same_v<T, MessageReference>) {
-                    values << messageLookup(arg.identifier)
-                                  .format({}, messageLookup, termLookup);
+                    auto message = messageLookup(arg.identifier);
+                    if (message) {
+                        values << message->format({}, messageLookup, termLookup);
+                    } else {
+                        // FIXME: This could probably be handled better
+                        values << "unknown message " << arg.identifier;
+                    }
                 } else if constexpr (std::is_same_v<T, TermReference>) {
-                    values << termLookup(arg.identifier)
-                                  .format({}, messageLookup, termLookup);
+                    auto term = termLookup(arg.identifier);
+                    if (term) {
+                        values << term->format({}, messageLookup, termLookup);
+                    } else {
+                        // FIXME: This could probably be handled better
+                        values << "unknown term " << arg.identifier;
+                    }
                 } else if constexpr (std::is_same_v<T, VariableReference>)
                     values << args.at(arg.identifier);
                 else
