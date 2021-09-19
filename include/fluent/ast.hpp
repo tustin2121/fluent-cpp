@@ -109,7 +109,8 @@ class Message {
 
     inline const std::string &getId() const { return this->id; }
     Message(std::optional<std::string> &&comment, std::string &&id,
-            std::vector<PatternElement> &&pattern, std::vector<Attribute> &&attributes);
+            std::optional<std::vector<PatternElement>> &&pattern,
+            std::vector<Attribute> &&attributes);
 
     const std::string format(
         const std::map<std::string, Variable> &args,

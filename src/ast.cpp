@@ -129,10 +129,12 @@ Attribute::Attribute(std::string &&id, std::vector<PatternElement> &&pattern)
 }
 
 Message::Message(std::optional<std::string> &&comment, std::string &&id,
-                 std::vector<PatternElement> &&pattern,
+                 std::optional<std::vector<PatternElement>> &&pattern,
                  std::vector<Attribute> &&attributes)
     : comment(std::move(comment)), id(std::move(id)) {
-    addPattern(std::move(pattern), this->pattern);
+    if (pattern) {
+        addPattern(std::move(*pattern), this->pattern);
+    }
     for (ast::Attribute &attribute : attributes) {
         this->attributes.insert(std::make_pair(attribute.getId(), attribute));
     }
@@ -241,7 +243,11 @@ boost::property_tree::ptree Attribute::getPropertyTree() const {
     identifier.put("type", "Identifier");
     identifier.put("name", this->id);
     root.add_child("id", identifier);
-    root.add_child("value", getPatternPropertyTree(this->pattern));
+    if (this->pattern.empty()) {
+        root.put("value", "null");
+    } else {
+        root.add_child("value", getPatternPropertyTree(this->pattern));
+    }
     return root;
 }
 
@@ -251,7 +257,11 @@ boost::property_tree::ptree Message::getPropertyTree() const {
     identifier.put("type", "Identifier");
     identifier.put("name", this->id);
     message.add_child("id", identifier);
-    message.add_child("value", getPatternPropertyTree(this->pattern));
+    if (this->pattern.empty()) {
+        message.put("value", "null");
+    } else {
+        message.add_child("value", getPatternPropertyTree(this->pattern));
+    }
     if (this->attributes.empty()) {
         message.put("attributes", "");
     } else {

@@ -252,12 +252,19 @@ struct Term {
 // Message ::= Identifier blank_inline? "="
 //   blank_inline? ((Pattern Attribute*) | (Attribute+))
 struct Message {
+    struct missing_pattern_or_attribute {
+        static constexpr auto name =
+            "Message must contain at least one pattern or atribute";
+    };
     static constexpr auto whitespace = dsl::lit_c<' '>;
     // FIXME: Add Attributes
     static constexpr auto rule =
         dsl::opt(dsl::peek(dsl::lit_c<'#'>) >> dsl::p<MessageComment>) +
-        dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> + dsl::p<Attributes> +
-        dsl::newline;
+        dsl::p<Identifier> + dsl::lit_c<'='> +
+        ((dsl::peek(dsl::p<Pattern>) | dsl::peek(dsl::p<Attribute>)) >>
+             (dsl::opt(dsl::peek(dsl::p<Pattern>) >> dsl::p<Pattern>) +
+              dsl::p<Attributes>) |
+         dsl::error<missing_pattern_or_attribute>)+dsl::newline;
     static constexpr auto value = lexy::construct<ast::Message>;
 };
 
