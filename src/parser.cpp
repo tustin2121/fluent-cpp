@@ -24,6 +24,7 @@
 #include <lexy/callback.hpp>
 #include <lexy/dsl.hpp>
 #include <lexy/input/file.hpp>
+#include <lexy/input/string_input.hpp>
 #include <lexy_ext/report_error.hpp>
 #include <map>
 #include <optional>
@@ -35,7 +36,6 @@
 
 #ifdef DEBUG_PARSER
 #include <lexy/action/parse_as_tree.hpp>
-#include <lexy/input/string_input.hpp>
 #include <lexy/visualize.hpp>
 #endif
 
@@ -145,17 +145,26 @@ struct VariableReference : lexy::token_production {
     static constexpr auto value = lexy::construct<ast::VariableReference>;
 };
 
+// AttributeAccessor   ::= "." Identifier
+struct AttributeAccessor {
+    static constexpr auto rule = dsl::lit_c<'.'> + dsl::p<Identifier>;
+    static constexpr auto value = lexy::forward<std::string>;
+};
+
 // MessageReference    ::= Identifier AttributeAccessor?
 struct MessageReference : lexy::token_production {
-    // FIXME: Add attribute accessors
-    static constexpr auto rule = dsl::p<Identifier>;
+    static constexpr auto rule =
+        dsl::p<Identifier> +
+        dsl::opt(dsl::peek(dsl::lit_c<'.'>) >> dsl::p<AttributeAccessor>);
     static constexpr auto value = lexy::construct<ast::MessageReference>;
 };
 
 // TermReference       ::= "-" Identifier AttributeAccessor? CallArguments?
 struct TermReference : lexy::token_production {
-    // FIXME: Add attribute accessors and arguments
-    static constexpr auto rule = dsl::lit_c<'-'> + dsl::p<Identifier>;
+    // FIXME: Add arguments
+    static constexpr auto rule =
+        dsl::lit_c<'-'> + dsl::p<Identifier> +
+        dsl::opt(dsl::peek(dsl::lit_c<'.'>) >> dsl::p<AttributeAccessor>);
     static constexpr auto value = lexy::construct<ast::TermReference>;
 };
 
@@ -304,6 +313,24 @@ std::vector<ast::Entry> parse(const char *filename) {
 
     auto parse_result =
         lexy::parse<grammar::Resource>(file.buffer(), lexy_ext::report_error);
+    if (parse_result)
+        return parse_result.value();
+    else
+        throw std::runtime_error("Failed to parse");
+}
+
+std::vector<ast::PatternElement> parsePattern(const std::string &input) {
+    auto parse_result = lexy::parse<grammar::Pattern>(
+        lexy::string_input<lexy::utf8_encoding>(input), lexy_ext::report_error);
+    if (parse_result)
+        return parse_result.value();
+    else
+        throw std::runtime_error("Failed to parse");
+}
+
+ast::MessageReference parseMessageReference(const std::string &input) {
+    auto parse_result = lexy::parse<grammar::MessageReference>(
+        lexy::string_input<lexy::utf8_encoding>(input), lexy_ext::report_error);
     if (parse_result)
         return parse_result.value();
     else

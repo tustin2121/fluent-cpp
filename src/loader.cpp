@@ -105,9 +105,20 @@ FluentLoader::formatMessage(const std::vector<icu::Locale> &locIdFallback,
             return this->getTerm(locIdFallback, identifier);
         };
 
-    auto message = this->getMessage(locIdFallback, resId);
+    ast::MessageReference messageRef = parseMessageReference(resId);
+    auto message = this->getMessage(locIdFallback, messageRef.identifier);
     if (message) {
-        return optional(message->format(std::move(args), messageLookup, termLookup));
+        if (messageRef.attribute) {
+            std::optional<ast::Attribute> attr =
+                message->getAttribute(*messageRef.attribute);
+            if (attr) {
+                return optional(
+                    attr->format(std::move(args), messageLookup, termLookup));
+            }
+        } else {
+            return optional(
+                message->format(std::move(args), messageLookup, termLookup));
+        }
     }
     return optional<string>();
 }

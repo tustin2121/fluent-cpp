@@ -42,12 +42,24 @@ struct VariableReference {
 
 struct MessageReference {
     std::string identifier;
-    MessageReference(std::string &&identifier) : identifier(std::move(identifier)) {}
+    std::optional<std::string> attribute;
+    MessageReference(std::string &&identifier, std::optional<std::string> &&attribute)
+        : identifier(std::move(identifier)), attribute(std::move(attribute)) {}
+
+#ifdef TEST
+    virtual std::string getPropertyTreeType() const { return "MessageReference"; }
+    virtual boost::property_tree::ptree getPropertyTree() const;
+#endif
 };
 
-struct TermReference {
-    std::string identifier;
-    TermReference(std::string &&identifier) : identifier(std::move(identifier)) {}
+struct TermReference : public MessageReference {
+    using MessageReference::MessageReference;
+
+#ifdef TEST
+  public:
+    boost::property_tree::ptree getPropertyTree() const override;
+    std::string getPropertyTreeType() const override { return "TermReference"; }
+#endif
 };
 
 /**
@@ -78,6 +90,8 @@ struct Junk {
     Junk(std::string &&value) : value(std::move(value)) {}
 };
 
+class Term;
+class Message;
 struct Attribute {
   private:
     std::string id;
@@ -91,9 +105,13 @@ struct Attribute {
     inline const std::string &getId() const { return this->id; }
 
     Attribute(std::string &&id, std::vector<PatternElement> &&pattern);
+
+    const std::string format(
+        const std::map<std::string, Variable> &args,
+        const std::function<std::optional<Message>(const std::string &)> messageLookup,
+        const std::function<std::optional<Term>(const std::string &)> termLookup) const;
 };
 
-class Term;
 class Message {
   protected:
     std::optional<std::string> comment;
@@ -106,6 +124,14 @@ class Message {
     virtual std::string getPropertyTreeType() const { return "Message"; }
     boost::property_tree::ptree getPropertyTree() const;
 #endif
+    inline const std::optional<Attribute>
+    getAttribute(const std::string &identifier) const {
+        auto iter = this->attributes.find(identifier);
+        if (iter != this->attributes.end()) {
+            return std::optional(iter->second);
+        }
+        return std::optional<Attribute>();
+    }
 
     inline const std::string &getId() const { return this->id; }
     Message(std::optional<std::string> &&comment, std::string &&id,

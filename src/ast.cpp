@@ -147,12 +147,13 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
     }
 }
 
-const std::string Message::format(
+const std::string formatPattern(
+    const std::vector<ast::PatternElement> &pattern,
     const std::map<std::string, Variable> &args,
     const std::function<std::optional<Message>(const std::string &)> messageLookup,
-    const std::function<std::optional<Term>(const std::string &)> termLookup) const {
+    const std::function<std::optional<Term>(const std::string &)> termLookup) {
     std::stringstream values;
-    for (const PatternElement &elem : this->pattern) {
+    for (const PatternElement &elem : pattern) {
         std::visit(
             [&values, &args, &messageLookup, &termLookup](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
@@ -163,18 +164,32 @@ const std::string Message::format(
                 else if constexpr (std::is_same_v<T, MessageReference>) {
                     auto message = messageLookup(arg.identifier);
                     if (message) {
-                        values << message->format({}, messageLookup, termLookup);
+                        if (arg.attribute) {
+                            std::optional<Attribute> attribute =
+                                message->getAttribute(*arg.attribute);
+                            values
+                                << attribute->format(args, messageLookup, termLookup);
+                        } else {
+                            values << message->format(args, messageLookup, termLookup);
+                        }
                     } else {
                         // FIXME: This could probably be handled better
-                        values << "unknown message " << arg.identifier;
+                        values << "unknown message " << arg;
                     }
                 } else if constexpr (std::is_same_v<T, TermReference>) {
+                    // FIXME: TermReferences can also have arguments
                     auto term = termLookup(arg.identifier);
                     if (term) {
-                        values << term->format({}, messageLookup, termLookup);
+                        if (arg.attribute) {
+                            std::optional<Attribute> attribute =
+                                term->getAttribute(*arg.attribute);
+                            values << attribute->format({}, messageLookup, termLookup);
+                        } else {
+                            values << term->format({}, messageLookup, termLookup);
+                        }
                     } else {
                         // FIXME: This could probably be handled better
-                        values << "unknown term " << arg.identifier;
+                        values << "unknown message " << arg;
                     }
                 } else if constexpr (std::is_same_v<T, VariableReference>)
                     values << args.at(arg.identifier);
@@ -186,8 +201,46 @@ const std::string Message::format(
     return values.str();
 }
 
+const std::string Attribute::format(
+    const std::map<std::string, Variable> &args,
+    const std::function<std::optional<Message>(const std::string &)> messageLookup,
+    const std::function<std::optional<Term>(const std::string &)> termLookup) const {
+    return formatPattern(this->pattern, args, messageLookup, termLookup);
+}
+
+const std::string Message::format(
+    const std::map<std::string, Variable> &args,
+    const std::function<std::optional<Message>(const std::string &)> messageLookup,
+    const std::function<std::optional<Term>(const std::string &)> termLookup) const {
+    return formatPattern(this->pattern, args, messageLookup, termLookup);
+}
+
 #ifdef TEST
 namespace pt = boost::property_tree;
+
+boost::property_tree::ptree MessageReference::getPropertyTree() const {
+    pt::ptree root, expression, id, attribute;
+    root.put("type", "Placeable");
+    expression.put("type", this->getPropertyTreeType());
+    id.put("type", "Identifier");
+    id.put("name", this->identifier);
+    expression.add_child("id", id);
+    if (this->attribute) {
+        attribute.put("type", "Identifier");
+        attribute.put("name", *this->attribute);
+        expression.add_child("attribute", attribute);
+    } else {
+        expression.put("attribute", "null");
+    }
+    root.add_child("expression", expression);
+    return root;
+}
+
+boost::property_tree::ptree TermReference::getPropertyTree() const {
+    pt::ptree root = MessageReference::getPropertyTree();
+    root.put("arguments", "null");
+    return root;
+}
 
 pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
     pt::ptree value, elements;
@@ -218,23 +271,9 @@ pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
                     varElem.add_child("expression", expression);
                     elements.push_back(std::make_pair("", varElem));
                 } else if constexpr (std::is_same_v<T, MessageReference>) {
-                    pt::ptree varElem, expression, id;
-                    varElem.put("type", "Placeable");
-                    expression.put("type", "MessageReference");
-                    id.put("type", "Identifier");
-                    id.put("name", arg.identifier);
-                    expression.add_child("id", id);
-                    varElem.add_child("expression", expression);
-                    elements.push_back(std::make_pair("", varElem));
+                    elements.push_back(std::make_pair("", arg.getPropertyTree()));
                 } else if constexpr (std::is_same_v<T, TermReference>) {
-                    pt::ptree varElem, expression, id;
-                    varElem.put("type", "Placeable");
-                    expression.put("type", "TermReference");
-                    id.put("type", "Identifier");
-                    id.put("name", arg.identifier);
-                    expression.add_child("id", id);
-                    varElem.add_child("expression", expression);
-                    elements.push_back(std::make_pair("", varElem));
+                    elements.push_back(std::make_pair("", arg.getPropertyTree()));
                 } else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },

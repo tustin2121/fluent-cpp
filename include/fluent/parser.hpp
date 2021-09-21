@@ -28,6 +28,8 @@ namespace fluent {
 
 // Fixme: return a map instead of a vector
 std::vector<ast::Entry> parse(const char *filename);
+std::vector<ast::PatternElement> parsePattern(const std::string &input);
+ast::MessageReference parseMessageReference(const std::string &input);
 } // namespace fluent
 
 #endif // PARSER_HPP_INCLUDED
