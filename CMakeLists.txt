@@ -13,8 +13,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(lexy)
 
-include_directories(include)
-
 set(FLUENT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/parser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ast.cpp
@@ -22,6 +20,7 @@ set(FLUENT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/loader.cpp
 )
 add_library(fluent ${FLUENT_SOURCES})
-target_link_libraries(fluent foonathan::lexy ${ICU_LIBRARIES})
+target_include_directories(fluent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(fluent foonathan::lexy::core foonathan::lexy::file ${ICU_LIBRARIES})
 
 add_subdirectory(tests)
