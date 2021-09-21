@@ -1,4 +1,4 @@
-find_package(Boost REQUIRED COMPONENTS json)
+find_package(Boost COMPONENTS json)
 find_package(GTest)
 
 add_definitions(-DTEST)
