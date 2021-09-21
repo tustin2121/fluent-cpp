@@ -70,11 +70,11 @@ static constexpr auto indented_char =
 struct CommentLine : lexy::token_production {
     struct CommentInner : lexy::token_production {
         static constexpr auto rule =
-            (dsl::lit_c<'#'> / dsl::lit<"##"> / dsl::lit<"###">)+dsl::opt(
-                dsl::peek_not(dsl::eol) >>
-                dsl::lit_c<' '> +
-                    dsl::capture(dsl::while_(dsl::peek_not(dsl::eol) >>
-                                             dsl::code_point - dsl::eol))) +
+            (dsl::lit_c<'#'> / LEXY_LIT("##") / LEXY_LIT("###")) +
+            dsl::opt(dsl::peek_not(dsl::eol) >>
+                     dsl::lit_c<' '> +
+                         dsl::capture(dsl::while_(dsl::peek_not(dsl::eol) >>
+                                                  dsl::code_point - dsl::eol))) +
             dsl::newline;
         static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
     };
