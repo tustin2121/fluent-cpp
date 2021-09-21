@@ -278,10 +278,10 @@ struct Message {
 };
 
 struct Entry : lexy::token_production {
-    static constexpr auto rule =
-        dsl::peek(dsl::p<Term>) >> dsl::p<Term> |
-        dsl::peek(dsl::p<Message>) >> dsl::p<Message> |
-        dsl::peek(dsl::lit_c<'#'>) >> dsl::p<CommentLine> | dsl::else_ >> dsl::p<Junk>;
+    static constexpr auto rule = dsl::peek(dsl::p<Term>) >> dsl::p<Term> |
+                                 dsl::peek(dsl::p<Message>) >> dsl::p<Message> |
+                                 dsl::peek(dsl::p<CommentLine>) >> dsl::p<CommentLine> |
+                                 dsl::else_ >> dsl::p<Junk>;
     static constexpr auto value = lexy::construct<ast::Entry>;
 };
 
