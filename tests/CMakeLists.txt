@@ -3,6 +3,7 @@ find_package(GTest)
 
 if (Boost_FOUND)
     add_definitions(-DTEST)
+    set(CMAKE_CXX_FLAGS --coverage)
     if (GTest_FOUND)
         add_executable(run_tests EXCLUDE_FROM_ALL parser.cpp static.cpp ${FLUENT_SOURCES})
         target_include_directories(run_tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)

@@ -21,12 +21,17 @@ test:
   stage: test
   needs: []
   before_script:
-  - pacman -Sy icu gtest boost cmake gcc make --noconfirm
+  - pacman -Sy icu gtest boost cmake gcc make lcov --noconfirm
   script:
     - mkdir build
     - cd build
     - cmake ..
     - make test
+    - gcov tests/CMakeFiles/run_tests.dir/__/**/*.gcno
+    - lcov --capture --directory tests/CMakeFiles/run_test.dir/__/ --output-file coverage.info
+    - lcov --remove coverage.info '/usr/*' -o coverage_filtered.info
+    - lcov --remove coverage_filtered.info `pwd`'/lexy/*' -o coverage_filtered2.info
+    - lcov --list coverage_filtered2.info
   allow_failure: true
 
 clang-format:
