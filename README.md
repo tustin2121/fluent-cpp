@@ -1,5 +1,9 @@
 # Fluent
 
+[![pipeline](https://gitlab.com/bmwinger/fluent-cpp/badges/master/pipeline.svg)](https://gitlab.com/bmwinger/fluent-cpp/-/commits/master)
+[![coverage](https://gitlab.com/bmwinger/fluent-cpp/badges/master/coverage.svg)](https://gitlab.com/bmwinger/fluent-cpp/-/commits/master)
+[![docs](https://img.shields.io/badge/docs-doxygen-blue)](https://bmwinger.gitlab.io/fluent-cpp)
+
 fluent-cpp is a C++ library which aims to implement [Project Fluent](https://projectfluent.org/).
 
 It is currently under development, highly unstable and only currently supports a subset of Project Fluent's ftl language.
