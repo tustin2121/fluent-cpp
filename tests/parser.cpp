@@ -62,7 +62,8 @@ void PrintTo(const pt::ptree &node, std::ostream *os) { pt::write_json(*os, node
 
 TEST_P(TestParser, ChecksParserOutput) {
     fs::path inputPath(GetParam());
-    std::vector<fluent::ast::Entry> ftl = fluent::parse(GetParam().c_str());
+    std::filesystem::path file(GetParam());
+    std::vector<fluent::ast::Entry> ftl = fluent::parseFile(file);
     pt::ptree expected;
     pt::read_json(inputPath.replace_extension(".json").c_str(), expected);
 

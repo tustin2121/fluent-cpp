@@ -296,10 +296,10 @@ struct Resource {
 
 } // namespace grammar
 
-std::vector<ast::Entry> parse(const char *filename) {
-    auto file = lexy::read_file<lexy::utf8_encoding>(filename);
+std::vector<ast::Entry> parseFile(const std::filesystem::path &filename) {
+    auto file = lexy::read_file<lexy::utf8_encoding>(filename.c_str());
     if (!file) {
-        throw std::runtime_error("file '" + std::string(filename) + "' not found");
+        throw std::runtime_error("file '" + filename.string() + "' not found");
     }
 
 #ifdef DEBUG_PARSER
@@ -316,6 +316,17 @@ std::vector<ast::Entry> parse(const char *filename) {
     if (parse_result)
         return parse_result.value();
     else
+        // FIXME: This should be a more specific error
+        throw std::runtime_error("Failed to parse");
+}
+
+std::vector<ast::Entry> parse(std::string &&input) {
+    auto parse_result = lexy::parse<grammar::Resource>(
+        lexy::string_input<lexy::utf8_encoding>(input), lexy_ext::report_error);
+    if (parse_result)
+        return parse_result.value();
+    else
+        // FIXME: This should be a more specific error
         throw std::runtime_error("Failed to parse");
 }
 

@@ -35,6 +35,8 @@ class FluentLoader {
     /// Mapping of Locale identifiers to the bundle for that locale.
     std::unordered_map<std::string, FluentBundle> bundles;
     void addResource(const icu::Locale locId, const std::filesystem::path &ftlpath);
+    void addResource(const icu::Locale locId, std::vector<ast::Entry> &&entries);
+    void addResource(const icu::Locale locId, std::string &&input);
 
     std::optional<ast::Message>
     getMessage(const std::vector<icu::Locale> &locIdFallback,
@@ -50,7 +52,28 @@ class FluentLoader {
     formatMessage(const std::vector<icu::Locale> &locIdFallback,
                   const std::string &resId,
                   const std::map<std::string, fluent::ast::Variable> &args) const;
+
+    friend void addStaticResource(const icu::Locale locId, std::string &&resource);
 };
+
+/**
+ * \brief Adds resource to the static loader.
+ *
+ * This is generally expected to be used with the ftlembed program, and shouldn't
+ * need to be called manually.
+ */
+void addStaticResource(const icu::Locale locId, std::string &&resource);
+
+/**
+ * \brief Formats a message from the static loader.
+ *
+ * As FluentLoader.formatMessage, but uses a static shared loader initialized
+ * via ftlembed and addStaticResource
+ */
+std::optional<std::string>
+formatStaticMessage(const std::vector<icu::Locale> &locIdFallback,
+                    const std::string &resId,
+                    const std::map<std::string, fluent::ast::Variable> &args);
 
 } // namespace fluent
 

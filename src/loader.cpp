@@ -31,7 +31,19 @@ namespace fluent {
 template <class> inline constexpr bool always_false_v = false;
 
 void FluentLoader::addResource(const icu::Locale locId, const path &ftlpath) {
-    std::vector<ast::Entry> entries = parse(ftlpath.c_str());
+    std::vector<ast::Entry> entries = parseFile(ftlpath);
+    this->addResource(locId, std::move(entries));
+}
+
+void FluentLoader::addResource(const icu::Locale locId, std::string &&input) {
+    std::vector<ast::Entry> entries = parse(std::move(input));
+    this->addResource(locId, std::move(entries));
+}
+
+void FluentLoader::addResource(const icu::Locale locId,
+                               std::vector<ast::Entry> &&entries) {
+    // FIXME: Handle bundle already existing for this resource by merging with
+    // existing bundle
     FluentBundle bundle;
     for (ast::Entry entry : entries) {
         std::visit(
@@ -121,6 +133,19 @@ FluentLoader::formatMessage(const std::vector<icu::Locale> &locIdFallback,
         }
     }
     return optional<string>();
+}
+
+FluentLoader STATIC_LOADER;
+
+void addStaticResource(const icu::Locale locId, std::string &&resource) {
+    STATIC_LOADER.addResource(locId, std::move(resource));
+}
+
+std::optional<std::string>
+formatStaticMessage(const std::vector<icu::Locale> &locIdFallback,
+                    const std::string &resId,
+                    const std::map<std::string, fluent::ast::Variable> &args) {
+    return STATIC_LOADER.formatMessage(locIdFallback, resId, args);
 }
 
 } // namespace fluent

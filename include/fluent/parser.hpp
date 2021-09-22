@@ -17,17 +17,22 @@
  *  along with fluent-cpp.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ *  \file parser.hpp
+ *  \brief Parsing of fluent resources from raw data
+ */
+
 #ifndef PARSER_HPP_INCLUDED
 #define PARSER_HPP_INCLUDED
 
 #include "fluent/ast.hpp"
+#include <filesystem>
 #include <vector>
 
 namespace fluent {
-// TODO: parse_pattern for parsing individual message patterns
-
 // Fixme: return a map instead of a vector
-std::vector<ast::Entry> parse(const char *filename);
+std::vector<ast::Entry> parseFile(const std::filesystem::path &file);
+std::vector<ast::Entry> parse(std::string &&contents);
 std::vector<ast::PatternElement> parsePattern(const std::string &input);
 ast::MessageReference parseMessageReference(const std::string &input);
 } // namespace fluent
