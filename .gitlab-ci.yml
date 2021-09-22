@@ -4,11 +4,14 @@ stages:
   - test
 
 clang-format:
-  image: hadolint/hadolint:latest-debian
+  image: archlinux:latest
   stage: lint
   needs: []
+  before_script:
+  - pacman -Sy clang --noconfirm
   script:
-    - clang-format -n -Werror include/*.hpp src/*.cpp tests/*.cpp
+    - shopt -s globstar
+    - clang-format -n -Werror include/**/*.hpp src/*.cpp tests/*.cpp
 
 pages:
   image: alpine
