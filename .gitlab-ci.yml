@@ -50,7 +50,7 @@ pages:
   script:
   - apk update && apk add doxygen
   - doxygen Doxyfile
-  - mv doxygen/doc/html/ public/
+  - mv doc/html/ public/
   artifacts:
     paths:
     - public
