@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    std::vector<fluent::ast::Entry> ftl = fluent::parse(argv[1]);
+    std::vector<fluent::ast::Entry> ftl = fluent::parseFile(argv[1]);
 
     pt::ptree actual, body;
     actual.put("type", "Resource");
