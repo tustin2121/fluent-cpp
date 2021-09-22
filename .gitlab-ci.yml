@@ -1,6 +1,23 @@
+stages:
+  - lint
+  - build
+  - test
+
 clang-format:
   image: hadolint/hadolint:latest-debian
   stage: lint
   needs: []
   script:
     - clang-format -n -Werror include/*.hpp src/*.cpp tests/*.cpp
+
+pages:
+  image: alpine
+  script:
+  - apk update && apk add doxygen
+  - doxygen doxygen/Doxyfile
+  - mv doxygen/doc/html/ public/
+  artifacts:
+    paths:
+    - public
+  only:
+  - master
