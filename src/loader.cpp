@@ -61,7 +61,28 @@ void FluentLoader::addResource(const icu::Locale locId,
             },
             std::move(entry));
     }
-    this->bundles.insert(std::make_pair(std::string(locId.getName()), bundle));
+    this->bundles.insert(std::make_pair(string(locId.getName()), bundle));
+}
+
+void FluentLoader::addMessage(icu::Locale &locId, string &&identifier,
+                              string &&messageContents) {
+    string localeName = string(locId.getName());
+    optional<std::vector<ast::PatternElement>> pattern =
+        parsePattern(std::move(messageContents));
+    if (pattern) {
+        ast::Message message(std::move(identifier), std::move(*pattern));
+        auto iter = this->bundles.find(localeName);
+        if (iter != this->bundles.end()) {
+            iter->second.addMessage(std::move(message));
+        } else {
+            FluentBundle bundle;
+            bundle.addMessage(std::move(message));
+            this->bundles.insert(std::make_pair(localeName, bundle));
+        }
+    } else {
+        throw std::runtime_error("Failed to parse message contents: " +
+                                 messageContents);
+    }
 }
 
 void FluentLoader::addDirectory(const string &dir) {
@@ -69,6 +90,20 @@ void FluentLoader::addDirectory(const string &dir) {
         if (dirEntry.is_regular_file()) {
             path file = dirEntry.path();
             if (file.extension() == ".ftl") {
+                icu::Locale locId =
+                    icu::Locale::createFromName(file.parent_path().stem().c_str());
+                this->addResource(locId, file);
+            }
+        }
+    }
+}
+
+void FluentLoader::addDirectory(const std::string &dir,
+                                const std::set<std::string> &resources) {
+    for (const auto &dirEntry : recursive_directory_iterator(dir)) {
+        if (dirEntry.is_regular_file()) {
+            path file = dirEntry.path();
+            if (file.extension() == ".ftl" && resources.contains(file.stem())) {
                 icu::Locale locId =
                     icu::Locale::createFromName(file.parent_path().stem().c_str());
                 this->addResource(locId, file);

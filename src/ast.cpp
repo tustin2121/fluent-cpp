@@ -147,6 +147,12 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
     }
 }
 
+Message::Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
+                 std::vector<Attribute> &&attributes,
+                 std::optional<std::string> &&comment)
+    : Message(std::move(comment), std::move(id), std::move(pattern),
+              std::move(attributes)) {}
+
 const std::string formatPattern(
     const std::vector<ast::PatternElement> &pattern,
     const std::map<std::string, Variable> &args,

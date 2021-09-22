@@ -17,6 +17,11 @@
  *  along with fluent-cpp.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ *  \file bundle.hpp
+ *  \brief Storage of messages and associated data for a specific locale
+ */
+
 #ifndef BUNDLE_HPP_INCLUDED
 #define BUNDLE_HPP_INCLUDED
 
@@ -30,6 +35,10 @@
 
 namespace fluent {
 
+/**
+ *  \class FluentBundle
+ *  \brief A class storing messages and associated data for a specific locale
+ */
 class FluentBundle {
   private:
     // Mapping of message identifiers to Messages
@@ -38,9 +47,23 @@ class FluentBundle {
     std::unordered_map<std::string, ast::Term> terms;
 
   public:
+    /**
+     * \brief Adds the given ast::Message to the bundle
+     */
     void addMessage(ast::Message &&message);
+    /**
+     * \brief Adds the given ast::Term to the bundle
+     */
     void addTerm(ast::Term &&term);
+    /**
+     * \brief Fetches an ast::Message from this bundle
+     * \returns The ast::Message, or an empty optional if the ast::Message was not found
+     */
     std::optional<ast::Message> getMessage(const std::string &identifier) const;
+    /**
+     * \brief Fetches an ast::Term from this bundle
+     * \returns The ast::Term, or an empty optional if the ast::Term was not found
+     */
     std::optional<ast::Term> getTerm(const std::string &identifier) const;
 };
 

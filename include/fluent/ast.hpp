@@ -17,6 +17,11 @@
  *  along with fluent-cpp.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ *  \file ast.hpp
+ *  \brief Elements of the AST used to store fluent resources in memory
+ */
+
 #ifndef AST_HPP_INCLUDED
 #define AST_HPP_INCLUDED
 
@@ -35,11 +40,20 @@
 
 namespace fluent {
 namespace ast {
+
+/**
+ *  \class VariableReference
+ *  \brief A reference to a Variable within an expression.
+ */
 struct VariableReference {
     std::string identifier;
     VariableReference(std::string &&identifier) : identifier(std::move(identifier)) {}
 };
 
+/**
+ *  \class MessageReference
+ *  \brief A reference to a Message within an expression.
+ */
 struct MessageReference {
     std::string identifier;
     std::optional<std::string> attribute;
@@ -52,6 +66,10 @@ struct MessageReference {
 #endif
 };
 
+/**
+ *  \class TermReference
+ *  \brief A reference to a Term within an expression.
+ */
 struct TermReference : public MessageReference {
     using MessageReference::MessageReference;
 
@@ -63,7 +81,8 @@ struct TermReference : public MessageReference {
 };
 
 /**
- * A string literal enclosed in an expression, often used for escaping values
+ * \class StringLiteral
+ * \brief A string literal enclosed in an expression, often used for escaping values
  *
  * E.g. { "{" }
  */
@@ -76,14 +95,29 @@ struct StringLiteral {
 typedef std::variant<std::string, StringLiteral, VariableReference, MessageReference,
                      TermReference>
     PatternElement;
+/**
+ *  \typedef Variable
+ *  \brief data which may be passed as an argument when formatting messages.
+ */
 typedef std::variant<std::string> Variable;
 
+/**
+ * \class Comment
+ * \brief Data stored in a comment within a fluent resource.
+ *
+ * This class only stores isolated comments.
+ * Comments attached to messages are embedded in the Message.
+ */
 struct Comment {
     std::string value;
 
     Comment(std::string &&value) : value(std::move(value)) {}
 };
 
+/**
+ * \class Junk
+ * \brief Unparseable data in a fluent resource.
+ */
 struct Junk {
     std::string value;
 
@@ -92,6 +126,13 @@ struct Junk {
 
 class Term;
 class Message;
+/**
+ *  \class Attribute
+ *  \brief A subentity within a Message or Term.
+ *
+ *  Attributes cannot have their own attributes, but are otherwise functionally the same
+ *  as a Message.
+ */
 struct Attribute {
   private:
     std::string id;
@@ -112,6 +153,14 @@ struct Attribute {
         const std::function<std::optional<Term>(const std::string &)> termLookup) const;
 };
 
+/**
+ *  \class Message
+ *  \brief The core localisation unit of fluent.
+ *
+ *  A fluent resource file consists of a list of messages.
+ *
+ *  Each message has an identifier and a pattern, and may have additional attributes.
+ */
 class Message {
   protected:
     std::optional<std::string> comment;
@@ -138,6 +187,10 @@ class Message {
             std::optional<std::vector<PatternElement>> &&pattern,
             std::vector<Attribute> &&attributes);
 
+    Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
+            std::vector<Attribute> &&attributes = std::vector<Attribute>(),
+            std::optional<std::string> &&comment = std::optional<std::string>());
+
     const std::string format(
         const std::map<std::string, Variable> &args,
         const std::function<std::optional<Message>(const std::string &)> messageLookup,
@@ -147,6 +200,14 @@ class Message {
                                     const fluent::ast::Message &message);
 };
 
+/**
+ *  \class Term
+ *  \brief A Message for internal use within fluent resources
+ *
+ *  Terms when defined prefix their identifiers with ``-`` and can only be referenced
+ *  within other terms and messages. They cannot be accessed through the
+ *  fluent::FluentLoader
+ */
 class Term : public Message {
     using Message::Message;
 
