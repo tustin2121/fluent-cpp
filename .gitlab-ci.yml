@@ -2,6 +2,32 @@ stages:
   - lint
   - build
   - test
+  - deploy
+
+build:
+  image: archlinux:latest
+  stage: build
+  needs: []
+  before_script:
+  - pacman -Sy icu cmake gcc make --noconfirm
+  script:
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make
+
+test:
+  image: archlinux:latest
+  stage: test
+  needs: []
+  before_script:
+  - pacman -Sy icu gtest boost cmake gcc make --noconfirm
+  script:
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make test
+  allow_failure: true
 
 clang-format:
   image: archlinux:latest
@@ -15,6 +41,7 @@ clang-format:
 
 pages:
   image: alpine
+  stage: deploy
   script:
   - apk update && apk add doxygen
   - doxygen doxygen/Doxyfile
