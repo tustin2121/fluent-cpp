@@ -19,6 +19,7 @@
 
 #include "fluent/parser.hpp"
 #include "fluent/ast.hpp"
+#include <fstream>
 #include <lexy/action/parse.hpp>
 #include <lexy/action/trace.hpp>
 #include <lexy/callback.hpp>
@@ -297,22 +298,21 @@ struct Resource {
 } // namespace grammar
 
 std::vector<ast::Entry> parseFile(const std::filesystem::path &filename) {
-    auto file = lexy::read_file<lexy::utf8_encoding>(filename.c_str());
-    if (!file) {
-        throw std::runtime_error("file '" + filename.string() + "' not found");
-    }
-
+    std::ifstream ifs(filename);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+    auto stringInput = lexy::string_input<lexy::utf8_encoding>(content);
 #ifdef DEBUG_PARSER
-    lexy::trace<grammar::Resource>(stdout, file.buffer());
+    lexy::trace<grammar::Resource>(stdout, stringInput);
 
-    lexy::parse_tree_for<decltype(file.buffer())> tree;
-    auto result = lexy::parse_as_tree<grammar::Resource>(tree, file.buffer(),
+    lexy::parse_tree_for<decltype(stringInput)> tree;
+    auto result = lexy::parse_as_tree<grammar::Resource>(tree, stringInput,
                                                          lexy_ext::report_error);
     lexy::visualize(stdout, tree, {lexy::visualize_fancy});
 #endif
 
     auto parse_result =
-        lexy::parse<grammar::Resource>(file.buffer(), lexy_ext::report_error);
+        lexy::parse<grammar::Resource>(stringInput, lexy_ext::report_error);
     if (parse_result)
         return parse_result.value();
     else
