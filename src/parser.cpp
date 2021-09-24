@@ -69,42 +69,37 @@ static constexpr auto indented_char =
 
 // CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
 struct CommentLine : lexy::token_production {
-    struct CommentInner : lexy::token_production {
-        static constexpr auto rule =
-            (dsl::lit_c<'#'> / LEXY_LIT("##") / LEXY_LIT("###")) +
-            dsl::opt(dsl::peek_not(dsl::eol) >>
-                     dsl::lit_c<' '> +
-                         dsl::capture(dsl::while_(dsl::peek_not(dsl::eol) >>
-                                                  dsl::code_point - dsl::eol))) +
-            dsl::newline;
-        static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
-    };
-    static constexpr auto rule = dsl::p<CommentInner>;
-    static constexpr auto value = lexy::construct<ast::Comment>;
+    static constexpr auto rule =
+        (dsl::lit_c<'#'> / LEXY_LIT("##") / LEXY_LIT("###")) +
+        dsl::opt(
+            dsl::lit_c<' '> >>
+            dsl::capture(dsl::while_(dsl::code_point - dsl::lit_c<'\r'> - dsl::eol))) +
+        dsl::newline;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
+                                  lexy::construct<ast::Comment>;
 };
 
 struct MessageComment : lexy::token_production {
     static constexpr auto rule =
-        dsl::lit_c<'#'> +
-        dsl::opt(dsl::peek_not(dsl::eol) >>
-                 dsl::lit_c<' '> +
-                     dsl::capture(dsl::while_(dsl::peek_not(dsl::eol) >>
-                                              dsl::code_point - dsl::eol))) +
-        dsl::newline;
+        LEXY_LIT("# ") >>
+            dsl::capture(dsl::while_(dsl::code_point - dsl::lit_c<'\r'> - dsl::eol)) +
+                dsl::newline
+        | dsl::lit_c<'#'> >> (dsl::else_ >> dsl::nullopt) >> dsl::newline;
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
 };
 
 // Junk                ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
 // junk_line           ::= /[^\n]*/ ("\u000A" | EOF)
-static constexpr auto junk_char = dsl::code_point - dsl::newline;
+auto junk_line = dsl::until(dsl::newline);
+auto junk = junk_line + dsl::while_(junk_line - dsl::lit_c<'#'> - dsl::lit_c<'-'> -
+                                    dsl::ascii::alpha);
 struct Junk : lexy::token_production {
-    static constexpr auto rule =
-        dsl::capture(dsl::while_(junk_char) + dsl::eol +
-                     dsl::while_(dsl::peek_not(dsl::lit_c<'#'> / dsl::lit_c<'-'> /
-                                               dsl::ascii::alpha / dsl::eof) >>
-                                 dsl::while_(junk_char) + dsl::eol));
-    static constexpr auto value = lexy::callback<ast::Junk>(
-        [](auto text) { return ast::Junk(std::string(text.begin(), text.end())); });
+    static constexpr auto rule = dsl::capture(
+        junk_line + dsl::while_(dsl::peek_not(dsl::lit_c<'#'> / dsl::lit_c<'-'> /
+                                              dsl::ascii::alpha / dsl::eof) >>
+                                junk_line));
+    static constexpr auto value =
+        lexy::as_string<std::string, lexy::utf8_encoding> | lexy::construct<ast::Junk>;
 };
 
 struct Identifier : lexy::token_production {
@@ -119,19 +114,23 @@ struct Identifier : lexy::token_production {
 // inline_text         ::= text_char+
 struct inline_text : lexy::token_production {
     static constexpr auto rule = dsl::capture(dsl::while_one(text_char));
-    static constexpr auto value = lexy::callback<ast::PatternElement>([](auto text) {
-        return ast::PatternElement(std::string(text.begin(), text.end()));
-    });
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
+                                  lexy::construct<ast::PatternElement>;
 };
 
 struct opt_inline_text : lexy::token_production {
     static constexpr auto rule = dsl::capture(dsl::while_(text_char));
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
 };
+
 // block_text          ::= blank_block blank_inline indented_char inline_text?
 struct block_text : lexy::token_production {
-    static constexpr auto rule = dsl::capture(blank_block) + blank_inline +
-                                 dsl::capture(indented_char) + dsl::p<opt_inline_text>;
+    static constexpr auto rule = [] {
+        auto block_prefix = dsl::capture(blank_block) + blank_inline;
+        auto value =
+            block_prefix + dsl::capture(indented_char) + dsl::p<opt_inline_text>;
+        return dsl::peek(block_prefix + indented_char) >> value;
+    }();
     static constexpr auto value = lexy::callback<ast::PatternElement>(
         [](auto blank_block, auto indentedChar, auto text) {
             return ast::PatternElement(
@@ -142,30 +141,28 @@ struct block_text : lexy::token_production {
 };
 
 struct VariableReference : lexy::token_production {
-    static constexpr auto rule = dsl::lit_c<'$'> + dsl::p<Identifier>;
+    static constexpr auto rule = dsl::lit_c<'$'> >> dsl::p<Identifier>;
     static constexpr auto value = lexy::construct<ast::VariableReference>;
 };
 
 // AttributeAccessor   ::= "." Identifier
 struct AttributeAccessor {
-    static constexpr auto rule = dsl::lit_c<'.'> + dsl::p<Identifier>;
+    static constexpr auto rule = dsl::lit_c<'.'> >> dsl::p<Identifier>;
     static constexpr auto value = lexy::forward<std::string>;
 };
 
 // MessageReference    ::= Identifier AttributeAccessor?
 struct MessageReference : lexy::token_production {
-    static constexpr auto rule =
-        dsl::p<Identifier> +
-        dsl::opt(dsl::peek(dsl::lit_c<'.'>) >> dsl::p<AttributeAccessor>);
+    static constexpr auto rule = dsl::p<Identifier> >>
+                                 dsl::opt(dsl::p<AttributeAccessor>);
     static constexpr auto value = lexy::construct<ast::MessageReference>;
 };
 
 // TermReference       ::= "-" Identifier AttributeAccessor? CallArguments?
 struct TermReference : lexy::token_production {
     // FIXME: Add arguments
-    static constexpr auto rule =
-        dsl::lit_c<'-'> + dsl::p<Identifier> +
-        dsl::opt(dsl::peek(dsl::lit_c<'.'>) >> dsl::p<AttributeAccessor>);
+    static constexpr auto rule = dsl::lit_c<'-'> >> dsl::p<Identifier> >>
+                                 dsl::opt(dsl::p<AttributeAccessor>);
     static constexpr auto value = lexy::construct<ast::TermReference>;
 };
 
@@ -192,37 +189,36 @@ struct InlineExpression {
     struct expected_expression {
         static LEXY_CONSTEVAL auto name() { return "expected expression"; }
     };
-    static constexpr auto
-        rule = dsl::peek(dsl::lit_c<'"'>) >> dsl::p<StringLiteral> |
-               dsl::peek(dsl::lit_c<'$'>) >> dsl::p<VariableReference> |
-               dsl::peek(dsl::lit_c<'-'>) >> dsl::p<TermReference> |
-               dsl::peek(dsl::p<Identifier>) >> dsl::p<MessageReference> |
-               dsl::error<expected_expression>;
+    static constexpr auto rule = dsl::p<StringLiteral> | dsl::p<VariableReference> |
+                                 dsl::p<TermReference> | dsl::p<MessageReference> |
+                                 dsl::error<expected_expression>;
     static constexpr auto value = lexy::construct<ast::PatternElement>;
 };
 
 // inline_placeable    ::= "{" blank? (SelectExpression | InlineExpression) blank? "}"
 struct inline_placeable : lexy::token_production {
     // FIXME: Add Select Expression
-    static constexpr auto rule = dsl::lit_c<'{'> + opt_blank +
-                                 (dsl::p<InlineExpression>)+opt_blank + dsl::lit_c<'}'>;
+    static constexpr auto rule = dsl::lit_c<'{'> >> opt_blank +
+                                                        dsl::p<InlineExpression> +
+                                                        opt_blank + dsl::lit_c<'}'>;
     static constexpr auto value = lexy::forward<ast::PatternElement>;
 };
 
 // block_placeable     ::= blank_block blank_inline? inline_placeable
 struct block_placeable : lexy::token_production {
-    static constexpr auto rule =
-        blank_block + dsl::if_(blank_inline) + dsl::p<inline_placeable>;
+    static constexpr auto rule = [] {
+        auto block_prefix = blank_block + dsl::if_(blank_inline);
+        auto value = block_prefix + dsl::p<inline_placeable>;
+        return dsl::peek(block_prefix + dsl::lit_c<'{'>) >> value;
+    }();
     static constexpr auto value = lexy::forward<ast::PatternElement>;
 };
 
 // PatternElement      ::= inline_text | block_text | inline_placeable | block_placeable
 struct PatternElement : lexy::token_production {
     // FIXME: Add block_placeable
-    static constexpr auto rule =
-        dsl::peek(dsl::p<block_text>) >> dsl::p<block_text> |
-        dsl::peek(dsl::p<block_placeable>) >> dsl::p<block_placeable> |
-        dsl::peek(dsl::lit_c<'{'>) >> dsl::p<inline_placeable> | dsl::p<inline_text>;
+    static constexpr auto rule = dsl::p<block_text> | dsl::p<block_placeable> |
+                                 dsl::p<inline_placeable> | dsl::p<inline_text>;
     static constexpr auto value = lexy::forward<ast::PatternElement>;
 };
 
@@ -235,27 +231,29 @@ struct Pattern : lexy::token_production {
 
 // Attribute ::= line_end blank? "." Identifier blank_inline? "=" blank_inline? Pattern
 struct Attribute : lexy::token_production {
-    static constexpr auto rule = dsl::newline + opt_blank + dsl::lit_c<'.'> +
-                                 dsl::p<Identifier> + dsl::if_(blank_inline) +
-                                 dsl::lit_c<'='> + dsl::if_(blank_inline) +
-                                 dsl::p<Pattern>;
+    static constexpr auto
+        rule = dsl::token(dsl::newline + opt_blank + dsl::lit_c<'.'>) >>
+               dsl::p<Identifier> + dsl::if_(blank_inline) + dsl::lit_c<'='> +
+                   dsl::if_(blank_inline) + dsl::p<Pattern>;
     static constexpr auto value = lexy::construct<ast::Attribute>;
 };
 
+struct AttributesPlus : lexy::token_production {
+    static constexpr auto rule = dsl::list(dsl::p<Attribute>);
+    static constexpr auto value = lexy::as_list<std::vector<ast::Attribute>>;
+};
+
 struct Attributes : lexy::token_production {
-    static constexpr auto rule = dsl::opt(dsl::list(
-        dsl::peek(dsl::newline + opt_blank + dsl::lit_c<'.'>) >> dsl::p<Attribute>));
+    static constexpr auto rule = dsl::opt(dsl::list(dsl::p<Attribute>));
     static constexpr auto value = lexy::as_list<std::vector<ast::Attribute>>;
 };
 
 // Term ::= "-" Identifier blank_inline? "=" blank_inline? Pattern Attribute*
 struct Term {
     static constexpr auto whitespace = dsl::lit_c<' '>;
-    // FIXME: Add Attributes
-    static constexpr auto rule =
-        dsl::opt(dsl::peek(dsl::lit_c<'#'>) >> dsl::p<MessageComment>) +
-        dsl::lit_c<'-'> + dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> +
-        dsl::p<Attributes> + dsl::newline;
+    static constexpr auto rule = dsl::opt(dsl::p<MessageComment>) + dsl::lit_c<'-'> +
+                                 dsl::p<Identifier> + dsl::lit_c<'='> +
+                                 dsl::p<Pattern> + dsl::p<Attributes> + dsl::newline;
     static constexpr auto value = lexy::construct<ast::Term>;
 };
 
@@ -267,14 +265,13 @@ struct Message {
             "Message must contain at least one pattern or atribute";
     };
     static constexpr auto whitespace = dsl::lit_c<' '>;
-    // FIXME: Add Attributes
-    static constexpr auto rule =
-        dsl::opt(dsl::peek(dsl::lit_c<'#'>) >> dsl::p<MessageComment>) +
-        dsl::p<Identifier> + dsl::lit_c<'='> +
-        ((dsl::peek(dsl::p<Pattern>) | dsl::peek(dsl::p<Attribute>)) >>
-             (dsl::opt(dsl::peek(dsl::p<Pattern>) >> dsl::p<Pattern>) +
-              dsl::p<Attributes>) |
-         dsl::error<missing_pattern_or_attribute>)+dsl::newline;
+    static constexpr auto rule = [] {
+        auto comment = dsl::opt(dsl::p<MessageComment>);
+        auto value = dsl::p<Pattern> >> dsl::p<Attributes> | dsl::p<AttributesPlus> |
+                     dsl::error<missing_pattern_or_attribute>;
+
+        return comment + dsl::p<Identifier> + dsl::lit_c<'='> + value + dsl::newline;
+    }();
     static constexpr auto value = lexy::construct<ast::Message>;
 };
 
@@ -288,10 +285,8 @@ struct Entry : lexy::token_production {
 
 struct Resource {
     static constexpr auto ws = dsl::whitespace(blank_block);
-    // static constexpr auto ws = dsl::whitespace(dsl::newline);
     static constexpr auto rule =
-        dsl::opt(dsl::list(dsl::peek_not(dsl::eof) >> (ws + dsl::p<Entry> + ws))) +
-        dsl::eof;
+        dsl::terminator(dsl::eof).opt_list(ws + dsl::p<Entry> + ws);
     static constexpr auto value = lexy::as_list<std::vector<ast::Entry>>;
 };
 

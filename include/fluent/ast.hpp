@@ -187,6 +187,9 @@ class Message {
             std::optional<std::vector<PatternElement>> &&pattern,
             std::vector<Attribute> &&attributes);
 
+    Message(std::optional<std::string> &&comment, std::string &&id,
+            std::vector<Attribute> &&attributes);
+
     Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
             std::vector<Attribute> &&attributes = std::vector<Attribute>(),
             std::optional<std::string> &&comment = std::optional<std::string>());

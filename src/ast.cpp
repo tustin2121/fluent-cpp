@@ -147,6 +147,11 @@ Message::Message(std::optional<std::string> &&comment, std::string &&id,
     }
 }
 
+Message::Message(std::optional<std::string> &&comment, std::string &&id,
+                 std::vector<Attribute> &&attributes)
+    : Message(std::move(comment), std::move(id), std::vector<PatternElement>(),
+              std::move(attributes)) {}
+
 Message::Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
                  std::vector<Attribute> &&attributes,
                  std::optional<std::string> &&comment)
