@@ -135,28 +135,18 @@ Attribute::Attribute(std::string &&id, std::vector<PatternElement> &&pattern)
     addPattern(std::move(pattern), this->pattern);
 }
 
-Message::Message(std::optional<std::string> &&comment, std::string &&id,
-                 std::optional<std::vector<PatternElement>> &&pattern,
-                 std::vector<Attribute> &&attributes)
+Message::Message(std::string &&id, std::vector<Attribute> &&attributes)
+    : Message(std::move(id), std::vector<PatternElement>(), std::move(attributes)) {}
+
+Message::Message(std::string &&id, std::vector<PatternElement> &&pattern,
+                 std::vector<Attribute> &&attributes,
+                 std::optional<std::string> &&comment)
     : comment(std::move(comment)), id(std::move(id)) {
-    if (pattern) {
-        addPattern(std::move(*pattern), this->pattern);
-    }
+    addPattern(std::move(pattern), this->pattern);
     for (ast::Attribute &attribute : attributes) {
         this->attributes.insert(std::make_pair(attribute.getId(), attribute));
     }
 }
-
-Message::Message(std::optional<std::string> &&comment, std::string &&id,
-                 std::vector<Attribute> &&attributes)
-    : Message(std::move(comment), std::move(id), std::vector<PatternElement>(),
-              std::move(attributes)) {}
-
-Message::Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
-                 std::vector<Attribute> &&attributes,
-                 std::optional<std::string> &&comment)
-    : Message(std::move(comment), std::move(id), std::move(pattern),
-              std::move(attributes)) {}
 
 const std::string formatPattern(
     const std::vector<ast::PatternElement> &pattern,

@@ -31,8 +31,9 @@
 
 namespace fluent {
 // Fixme: return a map instead of a vector
-std::vector<ast::Entry> parseFile(const std::filesystem::path &file);
-std::vector<ast::Entry> parse(std::string &&contents);
+std::vector<ast::Entry> parseFile(const std::filesystem::path &file,
+                                  bool strict = false);
+std::vector<ast::Entry> parse(std::string &&contents, bool strict = false);
 std::vector<ast::PatternElement> parsePattern(const std::string &input);
 ast::MessageReference parseMessageReference(const std::string &input);
 } // namespace fluent
