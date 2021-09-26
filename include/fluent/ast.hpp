@@ -192,6 +192,8 @@ class Message {
     std::unordered_map<std::string, Attribute> attributes;
 
   public:
+    inline void setComment(std::string &&comment) { this->comment = comment; }
+
 #ifdef TEST
     virtual std::string getPropertyTreeType() const { return "Message"; }
     boost::property_tree::ptree getPropertyTree() const;
@@ -206,14 +208,9 @@ class Message {
     }
 
     inline const std::string &getId() const { return this->id; }
-    Message(std::optional<std::string> &&comment, std::string &&id,
-            std::optional<std::vector<PatternElement>> &&pattern,
-            std::vector<Attribute> &&attributes);
+    Message(std::string &&id, std::vector<Attribute> &&attributes);
 
-    Message(std::optional<std::string> &&comment, std::string &&id,
-            std::vector<Attribute> &&attributes);
-
-    Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
+    Message(std::string &&id, std::vector<PatternElement> &&pattern,
             std::vector<Attribute> &&attributes = std::vector<Attribute>(),
             std::optional<std::string> &&comment = std::optional<std::string>());
 
