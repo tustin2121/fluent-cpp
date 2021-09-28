@@ -9,7 +9,7 @@ build:
   stage: build
   needs: []
   before_script:
-  - pacman -Sy icu cmake gcc make --noconfirm
+  - pacman -Sy icu cmake gcc make patch --noconfirm
   script:
     - mkdir build
     - cd build
@@ -21,7 +21,7 @@ test:
   stage: test
   needs: []
   before_script:
-  - pacman -Sy icu gtest boost cmake gcc make lcov --noconfirm
+  - pacman -Sy icu gtest boost cmake gcc make lcov patch --noconfirm
   script:
     - mkdir build
     - cd build

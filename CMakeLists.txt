@@ -10,6 +10,8 @@ FetchContent_Declare(
     URL https://github.com/foonathan/lexy/archive/a59057d.zip
     URL_HASH MD5=9d162c12eb3a8ef546b5e74e454394f1
     SOURCE_DIR lexy
+    PATCH_COMMAND patch
+    ${CMAKE_CURRENT_BINARY_DIR}/lexy/include/lexy/visualize.hpp ${CMAKE_SOURCE_DIR}/lexy_unicode_err.patch
 )
 FetchContent_MakeAvailable(lexy)
 
