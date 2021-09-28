@@ -90,7 +90,7 @@ struct MessageComment : lexy::token_production {
 
 // Junk                ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
 // junk_line           ::= /[^\n]*/ ("\u000A" | EOF)
-auto junk_line = dsl::until(dsl::newline);
+auto junk_line = dsl::until(dsl::eol);
 auto junk = junk_line + dsl::while_(junk_line - dsl::lit_c<'#'> - dsl::lit_c<'-'> -
                                     dsl::ascii::alpha);
 struct Junk : lexy::token_production {
