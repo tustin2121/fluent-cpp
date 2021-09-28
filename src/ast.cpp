@@ -356,6 +356,47 @@ boost::property_tree::ptree Message::getPropertyTree() const {
     }
     return message;
 }
+
+void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {
+    std::visit(
+        [&parent](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, fluent::ast::Message>) {
+                parent.push_back(std::make_pair("", arg.getPropertyTree()));
+            } else if constexpr (std::is_same_v<T, fluent::ast::Term>) {
+                parent.push_back(std::make_pair("", arg.getPropertyTree()));
+            } else if constexpr (std::is_same_v<T, fluent::ast::AnyComment>) {
+                pt::ptree comment;
+                std::visit(
+                    [&comment](const auto &arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, fluent::ast::Comment>) {
+                            comment.put("type", "Comment");
+                            comment.put("content", arg.value);
+                        } else if constexpr (std::is_same_v<
+                                                 T, fluent::ast::GroupComment>) {
+                            comment.put("type", "GroupComment");
+                            comment.put("content", arg.value);
+                        } else if constexpr (std::is_same_v<
+                                                 T, fluent::ast::ResourceComment>) {
+                            comment.put("type", "ResourceComment");
+                            comment.put("content", arg.value);
+                        } else
+                            static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                    },
+                    arg);
+                parent.push_back(std::make_pair("", comment));
+            } else if constexpr (std::is_same_v<T, fluent::ast::Junk>) {
+                pt::ptree comment;
+                comment.put("type", "Junk");
+                comment.put("annotations", "");
+                comment.put("content", arg.value);
+                parent.push_back(std::make_pair("", comment));
+            } else
+                static_assert(always_false_v<T>, "non-exhaustive visitor!");
+        },
+        entry);
+}
 #endif
 
 } // namespace ast

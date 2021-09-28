@@ -138,6 +138,28 @@ struct Comment {
 };
 
 /**
+ * \class GroupComment
+ * \brief Data stored in a comment heading a group of messages
+ *
+ * GroupComments are comments which start with a ##
+ */
+struct GroupComment : public Comment {
+    using Comment::Comment;
+};
+
+/**
+ * \class ResourceComment
+ * \brief Data stored in a comment heading a resource file
+ *
+ * ResourceComments are comments which start with ###
+ */
+struct ResourceComment : public Comment {
+    using Comment::Comment;
+};
+
+typedef std::variant<ast::Comment, ast::GroupComment, ast::ResourceComment> AnyComment;
+
+/**
  * \class Junk
  * \brief Unparseable data in a fluent resource.
  */
@@ -240,7 +262,11 @@ class Term : public Message {
 #endif
 };
 
-typedef std::variant<Comment, Message, Term, Junk> Entry;
+typedef std::variant<AnyComment, Message, Term, Junk> Entry;
+
+#ifdef TEST
+void processEntry(boost::property_tree::ptree &parent, fluent::ast::Entry &entry);
+#endif
 
 } // namespace ast
 } // namespace fluent

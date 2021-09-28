@@ -53,7 +53,7 @@ void FluentLoader::addResource(const icu::Locale locId,
                     bundle.addMessage(std::move(arg));
                 else if constexpr (std::is_same_v<T, ast::Term>)
                     bundle.addTerm(std::move(arg));
-                else if constexpr (std::is_same_v<T, ast::Comment>) {
+                else if constexpr (std::is_same_v<T, ast::AnyComment>) {
                 } else if constexpr (std::is_same_v<T, ast::Junk>) {
                 } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");

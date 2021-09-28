@@ -67,25 +67,46 @@ static constexpr auto opt_blank = dsl::while_(blank_inline | dsl::newline);
 static constexpr auto indented_char =
     text_char - dsl::lit_c<'['> - dsl::lit_c<'*'> - dsl::lit_c<'.'>;
 
-// CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
-struct CommentLine : lexy::token_production {
-    static constexpr auto
-        rule = (LEXY_LIT("# ") / LEXY_LIT("## ") / LEXY_LIT("### ")) >>
-                   dsl::capture(dsl::while_(dsl::code_point - dsl::ascii::newline)) +
-                       dsl::newline
-               | (LEXY_LIT("#") / LEXY_LIT("##") / LEXY_LIT("###")) >>
-                     (dsl::else_ >> dsl::nullopt) >> dsl::newline;
+// \r is not considered a newline, but may appear by itself in the text
+// So if a \r is read, we must peek and see if it's followed by a \n
+static constexpr auto comment_contents =
+    dsl::while_(dsl::code_point - dsl::ascii::newline);
+
+struct MessageComment : lexy::token_production {
+    static constexpr auto rule = [] {
+        auto with_value = LEXY_LIT("# ") >> dsl::capture(comment_contents) + dsl::eol;
+        auto no_value = LEXY_LIT("#") >> (dsl::else_ >> dsl::nullopt) >> dsl::eol;
+        return with_value | no_value;
+    }();
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
                                   lexy::construct<ast::Comment>;
 };
 
-struct MessageComment : lexy::token_production {
-    static constexpr auto
-        rule = LEXY_LIT("# ") >>
-                   dsl::capture(dsl::while_(dsl::code_point - dsl::ascii::newline)) +
-                       dsl::newline
-               | dsl::lit_c<'#'> >> (dsl::else_ >> dsl::nullopt) >> dsl::newline;
-    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+struct GroupComment : lexy::token_production {
+    static constexpr auto rule = [] {
+        auto with_value = LEXY_LIT("## ") >> dsl::capture(comment_contents) + dsl::eol;
+        auto no_value = LEXY_LIT("##") >> (dsl::else_ >> dsl::nullopt) >> dsl::eol;
+        return with_value | no_value;
+    }();
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
+                                  lexy::construct<ast::GroupComment>;
+};
+
+struct ResourceComment : lexy::token_production {
+    static constexpr auto rule = [] {
+        auto with_value = LEXY_LIT("### ") >> dsl::capture(comment_contents) + dsl::eol;
+        auto no_value = LEXY_LIT("###") >> (dsl::else_ >> dsl::nullopt) >> dsl::eol;
+        return with_value | no_value;
+    }();
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
+                                  lexy::construct<ast::ResourceComment>;
+};
+
+// CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
+struct CommentLine : lexy::token_production {
+    static constexpr auto rule =
+        dsl::p<ResourceComment> | dsl::p<GroupComment> | dsl::p<MessageComment>;
+    static constexpr auto value = lexy::construct<ast::AnyComment>;
 };
 
 // Junk                ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
@@ -285,7 +306,7 @@ struct Message {
 
 struct Entry : lexy::token_production {
     static constexpr auto rule = [] {
-        auto comment = dsl::p<CommentLine>;
+        auto comment = dsl::p<MessageComment>;
         auto entry = dsl::p<Term> | dsl::p<Message>;
 
         auto commented_entry = dsl::peek(LEXY_LIT("# ")) >> comment + dsl::if_(entry);
