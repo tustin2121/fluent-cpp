@@ -1,0 +1,14 @@
+diff --git a/include/lexy/visualize.hpp b/include/lexy/visualize.hpp
+index 1ad79fe9..1a12f3cb 100644
+--- a/include/lexy/visualize.hpp
++++ b/include/lexy/visualize.hpp
+@@ -392,7 +392,8 @@ OutputIt visualize_to(OutputIt out, lexy::lexeme<Reader> lexeme,
+         {
+             lexy::engine_cp_auto::error_code ec{};
+             auto                             cp = lexy::engine_cp_auto::parse(ec, reader);
+-            if (ec == lexy::engine_cp_auto::error_code::eof)
++            if (ec != lexy::engine_cp_auto::error_code{}
++                && !lexy::engine_cp_auto::recover(reader, ec))
+                 break;
+ 
+             out = visualize_to(out, cp, opts);
