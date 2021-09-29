@@ -132,9 +132,11 @@ typedef std::variant<std::string> Variable;
  * Comments attached to messages are embedded in the Message.
  */
 struct Comment {
-    std::string value;
+    std::vector<std::string> value;
 
-    Comment(std::string &&value) : value(std::move(value)) {}
+    std::string getValue() const;
+
+    Comment(std::vector<std::string> &&value) : value(std::move(value)) {}
 };
 
 /**
@@ -208,13 +210,13 @@ struct Attribute {
  */
 class Message {
   protected:
-    std::optional<std::string> comment;
+    std::optional<Comment> comment;
     std::string id;
     std::vector<PatternElement> pattern;
     std::unordered_map<std::string, Attribute> attributes;
 
   public:
-    inline void setComment(std::string &&comment) { this->comment = comment; }
+    inline void setComment(Comment &&comment) { this->comment = comment; }
 
 #ifdef TEST
     virtual std::string getPropertyTreeType() const { return "Message"; }
@@ -234,7 +236,7 @@ class Message {
 
     Message(std::string &&id, std::vector<PatternElement> &&pattern,
             std::vector<Attribute> &&attributes = std::vector<Attribute>(),
-            std::optional<std::string> &&comment = std::optional<std::string>());
+            std::optional<Comment> &&comment = std::optional<Comment>());
 
     const std::string format(
         const std::map<std::string, Variable> &args,

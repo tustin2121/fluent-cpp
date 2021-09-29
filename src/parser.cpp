@@ -72,38 +72,53 @@ static constexpr auto indented_char =
 static constexpr auto comment_contents =
     dsl::while_(dsl::code_point - dsl::ascii::newline);
 
-struct MessageComment : lexy::token_production {
-    static constexpr auto rule = [] {
-        auto with_value = LEXY_LIT("# ") >> dsl::capture(comment_contents) + dsl::eol;
-        auto no_value = LEXY_LIT("#") >> (dsl::else_ >> dsl::nullopt) >> dsl::eol;
-        return with_value | no_value;
-    }();
-    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
-                                  lexy::construct<ast::Comment>;
+struct MessageCommentLine : lexy::token_production {
+    // The Message comment may be followed by a group comment
+    // So we when parsing the MessageComment rule we need to be sure it stops when it
+    // encounters ## instead of failing
+    static constexpr auto
+        rule = dsl::peek(LEXY_LIT("#") + (dsl::lit_c<' '> / dsl::eol)) >>
+               LEXY_LIT("#") >>
+               dsl::opt(dsl::lit_c<' '> >> dsl::capture(comment_contents)) + dsl::eol;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
 };
 
-struct GroupComment : lexy::token_production {
-    static constexpr auto rule = [] {
-        auto with_value = LEXY_LIT("## ") >> dsl::capture(comment_contents) + dsl::eol;
-        auto no_value = LEXY_LIT("##") >> (dsl::else_ >> dsl::nullopt) >> dsl::eol;
-        return with_value | no_value;
-    }();
-    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
-                                  lexy::construct<ast::GroupComment>;
+struct MessageComment {
+    static constexpr auto rule = dsl::list(dsl::p<MessageCommentLine>);
+    static constexpr auto value =
+        lexy::as_list<std::vector<std::string>> >> lexy::construct<ast::Comment>;
 };
 
-struct ResourceComment : lexy::token_production {
-    static constexpr auto rule = [] {
-        auto with_value = LEXY_LIT("### ") >> dsl::capture(comment_contents) + dsl::eol;
-        auto no_value = LEXY_LIT("###") >> (dsl::else_ >> dsl::nullopt) >> dsl::eol;
-        return with_value | no_value;
-    }();
-    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
+struct GroupCommentLine : lexy::token_production {
+    // The Group comment may be followed by a resource comment
+    static constexpr auto
+        rule = dsl::peek(LEXY_LIT("##") + (dsl::lit_c<' '> / dsl::eol)) >>
+               LEXY_LIT("##") >>
+               dsl::opt(dsl::lit_c<' '> >> dsl::capture(comment_contents)) + dsl::eol;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+};
+
+struct GroupComment {
+    static constexpr auto rule = dsl::list(dsl::p<GroupCommentLine>);
+    static constexpr auto value =
+        lexy::as_list<std::vector<std::string>> >> lexy::construct<ast::GroupComment>;
+};
+
+struct ResourceCommentLine : lexy::token_production {
+    static constexpr auto
+        rule = LEXY_LIT("###") >>
+               dsl::opt(dsl::lit_c<' '> >> dsl::capture(comment_contents)) + dsl::eol;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+};
+
+struct ResourceComment {
+    static constexpr auto rule = dsl::list(dsl::p<ResourceCommentLine>);
+    static constexpr auto value = lexy::as_list<std::vector<std::string>> >>
                                   lexy::construct<ast::ResourceComment>;
 };
 
 // CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
-struct CommentLine : lexy::token_production {
+struct Comment : lexy::token_production {
     static constexpr auto rule =
         dsl::p<ResourceComment> | dsl::p<GroupComment> | dsl::p<MessageComment>;
     static constexpr auto value = lexy::construct<ast::AnyComment>;
@@ -306,19 +321,20 @@ struct Message {
 
 struct Entry : lexy::token_production {
     static constexpr auto rule = [] {
-        auto comment = dsl::p<MessageComment>;
+        auto comment = dsl::p<Comment>;
         auto entry = dsl::p<Term> | dsl::p<Message>;
 
-        auto commented_entry = dsl::peek(LEXY_LIT("# ")) >> comment + dsl::if_(entry);
+        auto commented_entry =
+            dsl::peek(LEXY_LIT("# ")) >> dsl::p<MessageComment> + dsl::if_(entry);
 
         // commented_entry must be before comment
-        // since commented_entry is prefixed with a comment
+        // since commented_entry is prefixed with part of comment
         return commented_entry | comment | entry;
     }();
     static constexpr auto value =
         lexy::callback<ast::Entry>([](auto entry) { return entry; },
                                    [](ast::Comment comment, auto entry) {
-                                       entry.setComment(std::move(comment.value));
+                                       entry.setComment(std::move(comment));
                                        return entry;
                                    });
 };

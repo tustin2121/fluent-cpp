@@ -62,6 +62,16 @@ std::ostream &operator<<(std::ostream &out, const Variable &var) {
     return out;
 }
 
+std::string Comment::getValue() const {
+    std::stringstream result;
+    for (int i = 0; i < this->value.size(); i++) {
+        result << this->value[i];
+        if (i != this->value.size() - 1)
+            result << std::endl;
+    }
+    return result.str();
+}
+
 // Text elements should be stripped to remove leading and trailing whitespace on
 // each line
 std::string strip(const std::string &str, const std::string &ws = " \r\n") {
@@ -120,8 +130,7 @@ Message::Message(std::string &&id, std::vector<Attribute> &&attributes)
     : Message(std::move(id), std::vector<PatternElement>(), std::move(attributes)) {}
 
 Message::Message(std::string &&id, std::vector<PatternElement> &&pattern,
-                 std::vector<Attribute> &&attributes,
-                 std::optional<std::string> &&comment)
+                 std::vector<Attribute> &&attributes, std::optional<Comment> &&comment)
     : comment(std::move(comment)), id(std::move(id)) {
     addPattern(std::move(pattern), this->pattern);
     for (ast::Attribute &attribute : attributes) {
@@ -349,7 +358,7 @@ boost::property_tree::ptree Message::getPropertyTree() const {
     }
     if (this->comment) {
         comment.put("type", "Comment");
-        comment.put("content", *this->comment);
+        comment.put("content", this->comment->getValue());
         message.add_child("comment", comment);
     } else {
         message.put("comment", "null");
@@ -372,15 +381,15 @@ void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {
                         using T = std::decay_t<decltype(arg)>;
                         if constexpr (std::is_same_v<T, fluent::ast::Comment>) {
                             comment.put("type", "Comment");
-                            comment.put("content", arg.value);
+                            comment.put("content", arg.getValue());
                         } else if constexpr (std::is_same_v<
                                                  T, fluent::ast::GroupComment>) {
                             comment.put("type", "GroupComment");
-                            comment.put("content", arg.value);
+                            comment.put("content", arg.getValue());
                         } else if constexpr (std::is_same_v<
                                                  T, fluent::ast::ResourceComment>) {
                             comment.put("type", "ResourceComment");
-                            comment.put("content", arg.value);
+                            comment.put("content", arg.getValue());
                         } else
                             static_assert(always_false_v<T>, "non-exhaustive visitor!");
                     },
