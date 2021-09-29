@@ -167,20 +167,15 @@ struct TermReference : lexy::token_production {
 };
 
 struct StringLiteral : lexy::token_production {
-    struct StringLiteralInner : lexy::transparent_production {
-        static constexpr auto escaped_symbols = lexy::symbol_table<char> //
-                                                    .map<'"'>('"')
-                                                    .map<'\\'>('\\');
-        static constexpr auto escape =
-            dsl::backslash_escape //
-                .symbol<escaped_symbols>()
-                .rule(dsl::lit_c<'u'> >> dsl::code_point_id<4>);
-        static constexpr auto rule =
-            dsl::quoted(dsl::code_point - dsl::newline, escape);
-        static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
-    };
-    static constexpr auto rule = dsl::p<StringLiteralInner>;
-    static constexpr auto value = lexy::construct<ast::StringLiteral>;
+    static constexpr auto escaped_symbols = lexy::symbol_table<char> //
+                                                .map<'"'>('"')
+                                                .map<'\\'>('\\');
+    static constexpr auto escape = dsl::backslash_escape //
+                                       .symbol<escaped_symbols>()
+                                       .rule(dsl::lit_c<'u'> >> dsl::code_point_id<4>);
+    static constexpr auto rule = dsl::quoted(dsl::code_point - dsl::newline, escape);
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> >>
+                                  lexy::construct<ast::StringLiteral>;
 };
 
 // InlineExpression    ::= StringLiteral | NumberLiteral | FunctionReference |
