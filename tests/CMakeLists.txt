@@ -5,7 +5,7 @@ if (Boost_FOUND)
     add_definitions(-DTEST)
     set(CMAKE_CXX_FLAGS --coverage)
     if (GTest_FOUND)
-        add_executable(run_tests EXCLUDE_FROM_ALL parser.cpp static.cpp ${FLUENT_SOURCES})
+        add_executable(run_tests EXCLUDE_FROM_ALL parser.cpp loader.cpp ${FLUENT_SOURCES})
         target_include_directories(run_tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
         target_link_libraries(run_tests foonathan::lexy ${ICU_LIBRARIES}
             GTest::gtest_main Boost::boost)
