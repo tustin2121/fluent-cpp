@@ -11,7 +11,8 @@ int main(int argc, char **argv) {
 
     std::filesystem::create_directories(std::filesystem::path(argv[2]).parent_path());
 
-    std::string localeName = std::filesystem::path(argv[1]).parent_path().stem();
+    std::string localeName =
+        std::filesystem::path(argv[1]).parent_path().stem().string();
 
     std::ifstream input(argv[1], std::ifstream::in);
     std::ofstream output(argv[2], std::ofstream::out);
