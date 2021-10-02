@@ -24,9 +24,23 @@
 #include <optional>
 #include <unicode/locid.h>
 
-TEST(TestStatic, ChecksStaticLoader) {
+TEST(TestStatic, BasicString) {
     std::optional<std::string> result =
         fluent::formatStaticMessage({icu::Locale("en")}, "cli-help", {});
     ASSERT_TRUE(result);
     ASSERT_EQ(*result, "Print help message");
+}
+
+TEST(TestStatic, FloatLiteral) {
+    std::optional<std::string> result =
+        fluent::formatStaticMessage({icu::Locale("en")}, "float-format", {});
+    ASSERT_TRUE(result);
+    ASSERT_EQ(*result, "1.0");
+}
+
+TEST(TestStatic, IntLiteral) {
+    std::optional<std::string> result =
+        fluent::formatStaticMessage({icu::Locale("en")}, "integer-format", {});
+    ASSERT_TRUE(result);
+    ASSERT_EQ(*result, "10");
 }

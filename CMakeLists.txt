@@ -3,7 +3,7 @@ cmake_policy(SET CMP0074 NEW)
 project(fluent VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(ICU COMPONENTS data uc REQUIRED)
+find_package(ICU COMPONENTS uc i18n REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(

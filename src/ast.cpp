@@ -18,6 +18,9 @@
  */
 
 #include "fluent/ast.hpp"
+#include <iomanip>
+#include <unicode/errorcode.h>
+#include <unicode/numberformatter.h>
 
 #include <sstream>
 
@@ -92,36 +95,14 @@ void addPattern(std::vector<PatternElement> &&newPattern,
                         lastString = true;
                         last = arg;
                     }
-                } else if constexpr (std::is_same_v<T, StringLiteral>) {
+                } else {
                     if (lastString) {
                         existingPattern.push_back(PatternElement(strip(last)));
                         last = std::string();
                         lastString = false;
                     }
                     existingPattern.push_back(elem);
-                } else if constexpr (std::is_same_v<T, VariableReference>) {
-                    if (lastString) {
-                        existingPattern.push_back(PatternElement(strip(last)));
-                        last = std::string();
-                        lastString = false;
-                    }
-                    existingPattern.push_back(elem);
-                } else if constexpr (std::is_same_v<T, MessageReference>) {
-                    if (lastString) {
-                        existingPattern.push_back(PatternElement(strip(last)));
-                        last = std::string();
-                        lastString = false;
-                    }
-                    existingPattern.push_back(elem);
-                } else if constexpr (std::is_same_v<T, TermReference>) {
-                    if (lastString) {
-                        existingPattern.push_back(PatternElement(strip(last)));
-                        last = std::string();
-                        lastString = false;
-                    }
-                    existingPattern.push_back(elem);
-                } else
-                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                }
             },
             elem);
     }
@@ -158,21 +139,60 @@ Message::Message(std::string &&id, std::optional<std::vector<PatternElement>> &&
     : Message(std::move(comment), std::move(id), std::move(pattern),
               std::move(attributes)) {}
 
+// FIXME: this might not always be the desired formatter.
+// Do we want the number format to match the localisation, or to always use the
+// locale-specific format?
+static const icu::number::LocalizedNumberFormatter NUMBER_FORMATTER =
+    icu::number::NumberFormatter::withLocale(icu::Locale());
+
+const std::string NumberLiteral::format() const {
+    icu::ErrorCode status;
+    std::string buffer;
+
+    int decimalPos = this->value.find_first_of(".");
+    std::string result;
+    if (decimalPos == std::string::npos) {
+        result = NUMBER_FORMATTER.formatInt(stol(this->value), status)
+                     .toString(status)
+                     .toUTF8String(buffer);
+    } else {
+        int significantDigits = this->value.size() - decimalPos - 1;
+        auto formatter = NUMBER_FORMATTER.precision(
+            icu::number::Precision::minFraction(significantDigits));
+
+        return formatter.formatDouble(stod(this->value), status)
+            .toString(status)
+            .toUTF8String(buffer);
+    }
+
+    if (status.isSuccess())
+        return result;
+    else {
+        std::cerr << "Formatting number literal \"" << this->value
+                  << "\"failed: " << status.errorName() << std::endl;
+        // Fall back to the original literal value if formatting fails
+        return this->value;
+    }
+}
+
 const std::string formatPattern(
     const std::vector<ast::PatternElement> &pattern,
     const std::map<std::string, Variable> &args,
     const std::function<std::optional<Message>(const std::string &)> messageLookup,
     const std::function<std::optional<Term>(const std::string &)> termLookup) {
     std::stringstream values;
+
     for (const PatternElement &elem : pattern) {
         std::visit(
-            [&values, &args, &messageLookup, &termLookup](const auto &arg) {
+            [&](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>)
                     values << arg;
                 else if constexpr (std::is_same_v<T, StringLiteral>)
                     values << arg.value;
-                else if constexpr (std::is_same_v<T, MessageReference>) {
+                else if constexpr (std::is_same_v<T, NumberLiteral>) {
+                    values << arg.format();
+                } else if constexpr (std::is_same_v<T, MessageReference>) {
                     auto message = messageLookup(arg.identifier);
                     if (message) {
                         if (arg.attribute) {
@@ -272,6 +292,14 @@ pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
                     expression.put("type", "StringLiteral");
                     stringElem.add_child("expression", expression);
                     elements.push_back(std::make_pair("", stringElem));
+                } else if constexpr (std::is_same_v<T, NumberLiteral>) {
+                    pt::ptree stringElem, expression;
+                    stringElem.put("type", "Placeable");
+                    expression.put("value", arg.value);
+                    expression.put("type", "NumberLiteral");
+                    stringElem.add_child("expression", expression);
+                    elements.push_back(std::make_pair("", stringElem));
+
                 } else if constexpr (std::is_same_v<T, VariableReference>) {
                     pt::ptree varElem, expression, id;
                     varElem.put("type", "Placeable");

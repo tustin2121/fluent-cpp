@@ -92,8 +92,31 @@ struct StringLiteral {
     StringLiteral(std::string &&value) : value(std::move(value)) {}
 };
 
-typedef std::variant<std::string, StringLiteral, VariableReference, MessageReference,
-                     TermReference>
+/**
+ * \class NumberLiteral
+ * \brief A numeric decimal literal enclosed in an expression.
+ *
+ * The number format will be localised during formatting.
+ *
+ * The number of significant figures will be preserved in NumberLiterals
+ *
+ * E.g.
+ * - ``{ -3.14 }``
+ * - ``{ 100 }``
+ */
+struct NumberLiteral {
+    std::string value;
+
+    NumberLiteral(std::string &&value) : value(std::move(value)) {}
+
+    /**
+     * \brief Localises number literal
+     */
+    const std::string format() const;
+};
+
+typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReference,
+                     MessageReference, TermReference>
     PatternElement;
 /**
  *  \typedef Variable

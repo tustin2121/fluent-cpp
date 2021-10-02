@@ -166,6 +166,17 @@ struct TermReference : lexy::token_production {
     static constexpr auto value = lexy::construct<ast::TermReference>;
 };
 
+// NumberLiteral       ::= "-"? digits ("." digits)?
+struct NumberLiteral : lexy::token_production {
+    static constexpr auto rule = [] {
+        auto digits = dsl::digits<>;
+        auto decimal = dsl::if_(dsl::lit_c<'.'> >> digits);
+        return dsl::capture(dsl::lit_c<'-'> >> digits >> decimal | digits >> decimal);
+    }();
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
+                                  lexy::construct<ast::NumberLiteral>;
+};
+
 struct StringLiteral : lexy::token_production {
     static constexpr auto escaped_symbols = lexy::symbol_table<char> //
                                                 .map<'"'>('"')
@@ -184,8 +195,10 @@ struct InlineExpression {
     struct expected_expression {
         static LEXY_CONSTEVAL auto name() { return "expected expression"; }
     };
-    static constexpr auto rule = dsl::p<StringLiteral> | dsl::p<VariableReference> |
-                                 dsl::p<TermReference> | dsl::p<MessageReference> |
+    // Note: order is necessary for parsing
+    static constexpr auto rule = dsl::p<StringLiteral> | dsl::p<NumberLiteral> |
+                                 dsl::p<MessageReference> | dsl::p<TermReference> |
+                                 dsl::p<VariableReference> |
                                  dsl::error<expected_expression>;
     static constexpr auto value = lexy::construct<ast::PatternElement>;
 };
