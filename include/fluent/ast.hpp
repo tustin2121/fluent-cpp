@@ -122,7 +122,7 @@ typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReferenc
  *  \typedef Variable
  *  \brief data which may be passed as an argument when formatting messages.
  */
-typedef std::variant<std::string> Variable;
+typedef std::variant<std::string, long, double> Variable;
 
 /**
  * \class Comment

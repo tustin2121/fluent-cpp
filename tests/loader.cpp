@@ -24,23 +24,23 @@
 #include <optional>
 #include <unicode/locid.h>
 
-TEST(TestStatic, BasicString) {
+void check_result(std::string message,
+                  std::map<std::string, fluent::ast::Variable> args,
+                  std::string expected) {
     std::optional<std::string> result =
-        fluent::formatStaticMessage({icu::Locale("en")}, "cli-help", {});
+        fluent::formatStaticMessage({icu::Locale("en")}, message, args);
     ASSERT_TRUE(result);
-    ASSERT_EQ(*result, "Print help message");
+    ASSERT_EQ(*result, expected);
 }
 
-TEST(TestStatic, FloatLiteral) {
-    std::optional<std::string> result =
-        fluent::formatStaticMessage({icu::Locale("en")}, "float-format", {});
-    ASSERT_TRUE(result);
-    ASSERT_EQ(*result, "1.0");
-}
+TEST(TestStatic, BasicString) { check_result("cli-help", {}, "Print help message"); }
+TEST(TestStatic, FloatLiteral) { check_result("float-format", {}, "1.0"); }
+TEST(TestStatic, IntLiteral) { check_result("integer-format", {}, "10"); }
 
-TEST(TestStatic, IntLiteral) {
-    std::optional<std::string> result =
-        fluent::formatStaticMessage({icu::Locale("en")}, "integer-format", {});
-    ASSERT_TRUE(result);
-    ASSERT_EQ(*result, "10");
-}
+TEST(TestStatic, StringVariable) { check_result("argument", {{"arg", "Foo"}}, "Foo"); }
+
+// Note: these tests may fail on non-english platforms due to relying on
+// user-preferred locale rather than the fallback chain when formatting numbers
+
+TEST(TestStatic, IntVariable) { check_result("argument", {{"arg", 10}}, "10"); }
+TEST(TestStatic, FloatVariable) { check_result("argument", {{"arg", 10.1}}, "10.1"); }

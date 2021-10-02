@@ -175,6 +175,42 @@ const std::string NumberLiteral::format() const {
     }
 }
 
+const std::string formatVariable(const Variable &variable) {
+    std::string buffer;
+    return std::visit(
+        [&](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, long>) {
+                icu::ErrorCode status;
+                std::string result = NUMBER_FORMATTER.formatInt(arg, status)
+                                         .toString(status)
+                                         .toUTF8String(buffer);
+                if (status.isSuccess()) {
+                    return result;
+                } else {
+                    std::cerr << "Formatting number \"" << arg
+                              << "\"failed: " << status.errorName() << std::endl;
+                    return std::to_string(arg);
+                }
+            } else if constexpr (std::is_same_v<T, double>) {
+                icu::ErrorCode status;
+                std::string result = NUMBER_FORMATTER.formatDouble(arg, status)
+                                         .toString(status)
+                                         .toUTF8String(buffer);
+                if (status.isSuccess()) {
+                    return result;
+                } else {
+                    std::cerr << "Formatting number \"" << arg
+                              << "\"failed: " << status.errorName() << std::endl;
+                    return std::to_string(arg);
+                }
+            }
+        },
+        variable);
+}
+
 const std::string formatPattern(
     const std::vector<ast::PatternElement> &pattern,
     const std::map<std::string, Variable> &args,
@@ -223,7 +259,7 @@ const std::string formatPattern(
                         values << "unknown message " << arg;
                     }
                 } else if constexpr (std::is_same_v<T, VariableReference>)
-                    values << args.at(arg.identifier);
+                    values << formatVariable(args.at(arg.identifier));
                 else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
