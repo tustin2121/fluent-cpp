@@ -91,7 +91,7 @@ void FluentLoader::addDirectory(const string &dir) {
             path file = dirEntry.path();
             if (file.extension() == ".ftl") {
                 icu::Locale locId =
-                    icu::Locale::createFromName(file.parent_path().stem().c_str());
+                    icu::Locale(file.parent_path().stem().string().c_str());
                 this->addResource(locId, file);
             }
         }
@@ -106,7 +106,7 @@ void FluentLoader::addDirectory(const std::string &dir,
             if (file.extension() == ".ftl" &&
                 resources.find(file.stem()) != resources.end()) {
                 icu::Locale locId =
-                    icu::Locale::createFromName(file.parent_path().stem().c_str());
+                    icu::Locale(file.parent_path().stem().string().c_str());
                 this->addResource(locId, file);
             }
         }
