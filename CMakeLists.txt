@@ -24,6 +24,7 @@ add_library(fluent ${FLUENT_SOURCES})
 target_include_directories(fluent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(fluent PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/lexy/include)
 target_link_libraries(fluent ${ICU_LIBRARIES})
+target_include_directories(fluent PUBLIC ${ICU_INCLUDE_DIRS})
 
 add_executable(ftlembed ${CMAKE_CURRENT_SOURCE_DIR}/src/embed.cpp)
 
