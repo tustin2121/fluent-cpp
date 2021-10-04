@@ -10,8 +10,7 @@ if (Boost_FOUND)
         target_link_libraries(run_tests foonathan::lexy ${ICU_LIBRARIES}
             GTest::gtest_main Boost::boost)
 
-        embed_ftl(${CMAKE_CURRENT_SOURCE_DIR}/l10n)
-        target_sources(run_tests PRIVATE ${FTL_EMBED_OUTPUT})
+        embed_ftl(run_tests ${CMAKE_CURRENT_SOURCE_DIR}/l10n)
     endif()
 
     add_executable(test_main EXCLUDE_FROM_ALL main.cpp ${FLUENT_SOURCES})
