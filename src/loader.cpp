@@ -171,17 +171,21 @@ FluentLoader::formatMessage(const std::vector<icu::Locale> &locIdFallback,
     return optional<string>();
 }
 
-FluentLoader STATIC_LOADER;
+FluentLoader *STATIC_LOADER = nullptr;
 
 void addStaticResource(const icu::Locale locId, std::string &&resource) {
-    STATIC_LOADER.addResource(locId, std::move(resource));
+    if (STATIC_LOADER == nullptr)
+        STATIC_LOADER = new FluentLoader();
+    STATIC_LOADER->addResource(locId, std::move(resource));
 }
 
 std::optional<std::string>
 formatStaticMessage(const std::vector<icu::Locale> &locIdFallback,
                     const std::string &resId,
                     const std::map<std::string, fluent::ast::Variable> &args) {
-    return STATIC_LOADER.formatMessage(locIdFallback, resId, args);
+    if (STATIC_LOADER == nullptr)
+        return std::optional<std::string>();
+    return STATIC_LOADER->formatMessage(locIdFallback, resId, args);
 }
 
 } // namespace fluent
