@@ -16,6 +16,26 @@ build:
     - cmake ..
     - make
 
+windows-build:
+  stage: build
+  needs: []
+  variables:
+    ICU_ROOT: "ICU"
+  tags:
+    - windows
+  before_script:
+    - Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+    - choco install cmake.install --installargs '"ADD_CMAKE_TO_PATH=System"' -y
+    - choco install 7zip -y
+    - refreshenv
+  script:
+    - mkdir build
+    - cd build
+    - iwr https://github.com/unicode-org/icu/releases/download/release-69-1/icu4c-69_1-Win64-MSVC2019.zip -OutFile icu4c-69_1-Win64-MSVC2019.zip
+    - 7z x -oICU icu4c-69_1-Win64-MSVC2019.zip
+    - cmake -DICU_LIBRARY="ICU/bin64/icuuc69.dll" -DICU_INCLUDE_DIR="ICU/include" ..
+    - cmake --build .
+
 test:
   image: archlinux:latest
   stage: test
