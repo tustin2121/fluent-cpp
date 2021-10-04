@@ -28,17 +28,22 @@ target_include_directories(fluent PUBLIC ${ICU_INCLUDE_DIRS})
 
 add_executable(ftlembed ${CMAKE_CURRENT_SOURCE_DIR}/src/embed.cpp)
 
-
-function(embed_ftl directory)
+function(embed_ftl target directory )
+    set(options PUBLIC PRIVATE INTERFACE)
+    cmake_parse_arguments(EMBED_FTL "${options}" "" "" "" ${ARGN})
     file(GLOB files "${directory}/*/*.ftl")
-    set(FTL_EMBED_OUTPUT "" PARENT_SCOPE)
     get_filename_component(dirname ${directory} NAME)
     foreach(file ${files})
         file(RELATIVE_PATH relative_file ${directory} ${file})
         string(REPLACE ".ftl" ".cpp" file_output
             ${CMAKE_CURRENT_BINARY_DIR}/${dirname}/${relative_file})
-        list(APPEND FTL_EMBED_OUTPUT ${file_output})
-        set(FTL_EMBED_OUTPUT ${FTL_EMBED_OUTPUT} PARENT_SCOPE)
+        if (EMBED_FTL_INTERFACE)
+            target_sources(${target} INTERFACE ${file_output})
+        elseif (EMBED_FTL_PUBLIC)
+            target_sources(${target} PUBLIC ${file_output})
+        else()
+            target_sources(${target} PRIVATE ${file_output})
+        endif()
         add_custom_command(
              OUTPUT ${file_output}
              DEPENDS ftlembed ${file}
