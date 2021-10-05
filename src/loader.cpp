@@ -104,7 +104,7 @@ void FluentLoader::addDirectory(const std::string &dir,
         if (dirEntry.is_regular_file()) {
             path file = dirEntry.path();
             if (file.extension() == ".ftl" &&
-                resources.find(file.stem()) != resources.end()) {
+                resources.find(file.stem().string()) != resources.end()) {
                 icu::Locale locId =
                     icu::Locale(file.parent_path().stem().string().c_str());
                 this->addResource(locId, file);
