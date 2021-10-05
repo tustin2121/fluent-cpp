@@ -149,14 +149,14 @@ const std::string NumberLiteral::format() const {
     icu::ErrorCode status;
     std::string buffer;
 
-    int decimalPos = this->value.find_first_of(".");
+    size_t decimalPos = this->value.find_first_of(".");
     std::string result;
     if (decimalPos == std::string::npos) {
         result = NUMBER_FORMATTER.formatInt(stol(this->value), status)
                      .toString(status)
                      .toUTF8String(buffer);
     } else {
-        int significantDigits = this->value.size() - decimalPos - 1;
+        size_t significantDigits = this->value.size() - decimalPos - 1;
         auto formatter = NUMBER_FORMATTER.precision(
             icu::number::Precision::minFraction(significantDigits));
 
