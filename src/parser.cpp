@@ -126,7 +126,9 @@ struct opt_inline_text : lexy::token_production {
 // block_text          ::= blank_block blank_inline indented_char inline_text?
 struct block_text : lexy::token_production {
     static constexpr auto rule = [] {
-        auto block_prefix = dsl::capture(blank_block) + blank_inline;
+        // Note: the indent needs to be captured as a whole as we will remove
+        // matching indents from the pattern later
+        auto block_prefix = dsl::capture(blank_block + blank_inline);
         auto value =
             block_prefix + dsl::capture(indented_char) + dsl::p<opt_inline_text>;
         return dsl::peek(block_prefix + indented_char) >> value;

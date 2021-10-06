@@ -41,6 +41,10 @@ TEST(TestStatic, StringVariable) { check_result("argument", {{"arg", "Foo"}}, "F
 
 // Note: these tests may fail on non-english platforms due to relying on
 // user-preferred locale rather than the fallback chain when formatting numbers
-
 TEST(TestStatic, IntVariable) { check_result("argument", {{"arg", 10}}, "10"); }
 TEST(TestStatic, FloatVariable) { check_result("argument", {{"arg", 10.1}}, "10.1"); }
+
+TEST(TestStatic, Indentation) { check_result("indentation", {}, "Foo\n    Bar"); }
+TEST(TestStatic, IndentationWithExpression) {
+    check_result("indentation-with-expression", {}, "Foo\n\nBar\n    Baz");
+}

@@ -18,11 +18,12 @@
  */
 
 #include "fluent/ast.hpp"
+#include <algorithm>
 #include <iomanip>
+#include <limits>
+#include <sstream>
 #include <unicode/errorcode.h>
 #include <unicode/numberformatter.h>
-
-#include <sstream>
 
 namespace fluent {
 namespace ast {
@@ -62,31 +63,86 @@ std::ostream &operator<<(std::ostream &out, const Variable &var) {
     return out;
 }
 
-// Text elements should be stripped to remove leading and trailing whitespace on
-// each line
-std::string strip(const std::string &str, const std::string &ws = " \r\n") {
+// The first text element should be stripped to remove leading whitespace
+std::string stripStart(const std::string &str, const std::string &ws = " \r\n") {
     const auto begin = str.find_first_not_of(ws);
     if (begin == std::string::npos)
         return "";
+
+    return str.substr(begin, std::string::npos);
+}
+
+std::string stripEnd(const std::string &str, const std::string &ws = " \r\n") {
     const auto end = str.find_last_not_of(ws);
+    return str.substr(0, end + 1);
+}
 
-    std::string stripped = str.substr(begin, end - begin + 1);
-
+std::string replaceNewlines(std::string &str) {
     size_t pos;
     // DOS newlines should be replaced with Unix newlines
-    while ((pos = stripped.find("\r\n")) != std::string::npos) {
-        stripped.replace(pos, 2, "\n");
+    while ((pos = str.find("\r\n")) != std::string::npos) {
+        str.replace(pos, 2, "\n");
     }
-    return stripped;
+    return str;
+}
+
+/**
+ * Finds minimum indent (on lines with something other than whitespace)
+ */
+int getMinIndent(const std::string &value) {
+    std::stringstream ss(value);
+    std::string line;
+    size_t minIndent = std::numeric_limits<size_t>::max();
+    while (std::getline(ss, line, '\n')) {
+        size_t startpos = line.find_first_not_of("\r\n ");
+        // Ignore lines which only contain whitespace
+        if (startpos != std::string::npos && startpos < minIndent)
+            minIndent = startpos;
+    }
+    return minIndent;
+}
+
+/**
+ * Removes minimum indent from all lines
+ */
+std::string stripIndent(const std::string value, const size_t indent) {
+    std::stringstream ss(value);
+    std::stringstream result;
+    std::string line;
+    while (std::getline(ss, line, '\n')) {
+        size_t startpos = line.find_first_not_of("\r\n ");
+        // Ignore lines which only contain whitespace
+        if (startpos != std::string::npos && startpos > 0) {
+            line.replace(0, std::min(indent, startpos), "");
+        }
+        result << line << '\n';
+    }
+
+    return result.str();
 }
 
 void addPattern(std::vector<PatternElement> &&newPattern,
                 std::vector<PatternElement> &existingPattern) {
     bool lastString = false;
     std::string last;
+    size_t minIndent = std::numeric_limits<size_t>::max();
     for (ast::PatternElement elem : newPattern) {
         std::visit(
-            [&elem, &existingPattern, &lastString, &last](const auto &arg) {
+            [&](const auto &arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    size_t indent = getMinIndent(arg);
+                    if (indent < minIndent)
+                        minIndent = indent;
+                }
+            },
+            elem);
+    }
+    // Only strip leading whitespace from the first text element
+    bool first = true;
+    for (ast::PatternElement elem : newPattern) {
+        std::visit(
+            [&](const auto &arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>) {
                     // If the previous element was a string, merge with it
@@ -97,7 +153,14 @@ void addPattern(std::vector<PatternElement> &&newPattern,
                     }
                 } else {
                     if (lastString) {
-                        existingPattern.push_back(PatternElement(strip(last)));
+                        if (first) {
+                            existingPattern.push_back(PatternElement(stripStart(
+                                stripIndent(replaceNewlines(last), minIndent))));
+                            first = false;
+                        } else {
+                            existingPattern.push_back(PatternElement(
+                                stripIndent(replaceNewlines(last), minIndent)));
+                        }
                         last = std::string();
                         lastString = false;
                     }
@@ -106,8 +169,14 @@ void addPattern(std::vector<PatternElement> &&newPattern,
             },
             elem);
     }
+    // Only strip trailing whitespace from the last text element
     if (lastString) {
-        existingPattern.push_back(PatternElement(strip(last)));
+        if (first)
+            existingPattern.push_back(PatternElement(
+                stripStart(stripEnd(stripIndent(replaceNewlines(last), minIndent)))));
+        else
+            existingPattern.push_back(PatternElement(
+                stripEnd(stripIndent(replaceNewlines(last), minIndent))));
     }
 }
 
