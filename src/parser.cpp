@@ -113,7 +113,7 @@ struct Identifier : lexy::token_production {
 
 // inline_text         ::= text_char+
 struct inline_text : lexy::token_production {
-    static constexpr auto rule = dsl::capture(dsl::while_one(text_char));
+    static constexpr auto rule = dsl::identifier(text_char);
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
                                   lexy::construct<ast::PatternElement>;
 };
