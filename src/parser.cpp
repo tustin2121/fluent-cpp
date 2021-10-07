@@ -198,10 +198,17 @@ struct InlineExpression {
         static LEXY_CONSTEVAL auto name() { return "expected expression"; }
     };
     // Note: order is necessary for parsing
-    static constexpr auto rule = dsl::p<StringLiteral> | dsl::p<NumberLiteral> |
-                                 dsl::p<MessageReference> | dsl::p<TermReference> |
-                                 dsl::p<VariableReference> |
-                                 dsl::error<expected_expression>;
+    static constexpr auto rule = [] {
+        // Note: since recurse does not produce a branch rule, we must inline
+        // inline_placeable here
+        auto inline_placeable = dsl::lit_c<'{'> >> opt_blank +
+                                                       dsl::recurse<InlineExpression> +
+                                                       opt_blank + dsl::lit_c<'}'>;
+        return dsl::p<StringLiteral> | dsl::p<NumberLiteral> |
+               dsl::p<MessageReference> | dsl::p<TermReference> |
+               dsl::p<VariableReference> | inline_placeable |
+               dsl::error<expected_expression>;
+    }();
     static constexpr auto value = lexy::construct<ast::PatternElement>;
 };
 
