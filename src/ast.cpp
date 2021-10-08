@@ -99,7 +99,7 @@ std::string replaceNewlines(std::string &str) {
 /**
  * Finds minimum indent (on lines with something other than whitespace)
  */
-int getMinIndent(const std::string &value) {
+size_t getMinIndent(const std::string &value) {
     std::stringstream ss(value);
     std::string line;
     size_t minIndent = std::numeric_limits<size_t>::max();
