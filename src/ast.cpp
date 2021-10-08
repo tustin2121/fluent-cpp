@@ -121,8 +121,10 @@ std::string stripIndent(const std::string value, const size_t indent) {
     std::string line;
     while (std::getline(ss, line, '\n')) {
         size_t startpos = line.find_first_not_of("\r\n ");
-        // Ignore lines which only contain whitespace
-        if (startpos != std::string::npos && startpos > 0) {
+        // Clear lines which only contain whitespace
+        if (startpos == std::string::npos) {
+            line = "";
+        } else if (startpos > 0) {
             line.replace(0, std::min(indent, startpos), "");
         }
         result << line << '\n';
