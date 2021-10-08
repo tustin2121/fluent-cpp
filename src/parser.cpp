@@ -220,7 +220,8 @@ struct StringLiteral : lexy::token_production {
                                                 .map<'\\'>('\\');
     static constexpr auto escape = dsl::backslash_escape //
                                        .symbol<escaped_symbols>()
-                                       .rule(dsl::lit_c<'u'> >> dsl::code_point_id<4>);
+                                       .rule(dsl::lit_c<'u'> >> dsl::code_point_id<4>)
+                                       .rule(dsl::lit_c<'U'> >> dsl::code_point_id<6>);
     static constexpr auto rule =
         dsl::quoted.limit(dsl::newline)(dsl::code_point - dsl::newline, escape);
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> >>
