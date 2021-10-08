@@ -65,7 +65,7 @@ std::ostream &operator<<(std::ostream &out, const Variable &var) {
 
 std::string Comment::getValue() const {
     std::stringstream result;
-    for (int i = 0; i < this->value.size(); i++) {
+    for (size_t i = 0; i < this->value.size(); i++) {
         result << this->value[i];
         if (i != this->value.size() - 1)
             result << std::endl;
