@@ -132,10 +132,34 @@ typedef std::variant<std::string, long, double> Variable;
  * Comments attached to messages are embedded in the Message.
  */
 struct Comment {
-    std::string value;
+    std::vector<std::string> value;
 
-    Comment(std::string &&value) : value(std::move(value)) {}
+    std::string getValue() const;
+
+    Comment(std::vector<std::string> &&value) : value(std::move(value)) {}
 };
+
+/**
+ * \class GroupComment
+ * \brief Data stored in a comment heading a group of messages
+ *
+ * GroupComments are comments which start with a ##
+ */
+struct GroupComment : public Comment {
+    using Comment::Comment;
+};
+
+/**
+ * \class ResourceComment
+ * \brief Data stored in a comment heading a resource file
+ *
+ * ResourceComments are comments which start with ###
+ */
+struct ResourceComment : public Comment {
+    using Comment::Comment;
+};
+
+typedef std::variant<ast::Comment, ast::GroupComment, ast::ResourceComment> AnyComment;
 
 /**
  * \class Junk
@@ -186,12 +210,14 @@ struct Attribute {
  */
 class Message {
   protected:
-    std::optional<std::string> comment;
+    std::optional<Comment> comment;
     std::string id;
     std::vector<PatternElement> pattern;
     std::unordered_map<std::string, Attribute> attributes;
 
   public:
+    inline void setComment(Comment &&comment) { this->comment = comment; }
+
 #ifdef TEST
     virtual std::string getPropertyTreeType() const { return "Message"; }
     boost::property_tree::ptree getPropertyTree() const;
@@ -206,16 +232,11 @@ class Message {
     }
 
     inline const std::string &getId() const { return this->id; }
-    Message(std::optional<std::string> &&comment, std::string &&id,
-            std::optional<std::vector<PatternElement>> &&pattern,
-            std::vector<Attribute> &&attributes);
+    Message(std::string &&id, std::vector<Attribute> &&attributes);
 
-    Message(std::optional<std::string> &&comment, std::string &&id,
-            std::vector<Attribute> &&attributes);
-
-    Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
+    Message(std::string &&id, std::vector<PatternElement> &&pattern,
             std::vector<Attribute> &&attributes = std::vector<Attribute>(),
-            std::optional<std::string> &&comment = std::optional<std::string>());
+            std::optional<Comment> &&comment = std::optional<Comment>());
 
     const std::string format(
         const std::map<std::string, Variable> &args,
@@ -243,7 +264,11 @@ class Term : public Message {
 #endif
 };
 
-typedef std::variant<Comment, Message, Term, Junk> Entry;
+typedef std::variant<AnyComment, Message, Term, Junk> Entry;
+
+#ifdef TEST
+void processEntry(boost::property_tree::ptree &parent, fluent::ast::Entry &entry);
+#endif
 
 } // namespace ast
 } // namespace fluent

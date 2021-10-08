@@ -67,25 +67,61 @@ static constexpr auto opt_blank = dsl::while_(blank_inline | dsl::newline);
 static constexpr auto indented_char =
     text_char - dsl::lit_c<'['> - dsl::lit_c<'*'> - dsl::lit_c<'.'>;
 
-// CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
-struct CommentLine : lexy::token_production {
-    static constexpr auto rule =
-        (dsl::lit_c<'#'> / LEXY_LIT("##") / LEXY_LIT("###")) +
-        dsl::opt(
-            dsl::lit_c<' '> >>
-            dsl::capture(dsl::while_(dsl::code_point - dsl::lit_c<'\r'> - dsl::eol))) +
-        dsl::newline;
-    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
-                                  lexy::construct<ast::Comment>;
+// \r is not considered a newline, but may appear by itself in the text
+// So if a \r is read, we must peek and see if it's followed by a \n
+static constexpr auto comment_contents =
+    dsl::while_(dsl::code_point - dsl::ascii::newline);
+
+struct MessageCommentLine : lexy::token_production {
+    // The Message comment may be followed by a group comment
+    // So we when parsing the MessageComment rule we need to be sure it stops when it
+    // encounters ## instead of failing
+    static constexpr auto
+        rule = dsl::peek(LEXY_LIT("#") + (dsl::lit_c<' '> / dsl::eol)) >>
+               LEXY_LIT("#") >>
+               dsl::opt(dsl::lit_c<' '> >> dsl::capture(comment_contents)) + dsl::eol;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
 };
 
-struct MessageComment : lexy::token_production {
-    static constexpr auto rule =
-        LEXY_LIT("# ") >>
-            dsl::capture(dsl::while_(dsl::code_point - dsl::lit_c<'\r'> - dsl::eol)) +
-                dsl::newline
-        | dsl::lit_c<'#'> >> (dsl::else_ >> dsl::nullopt) >> dsl::newline;
+struct MessageComment {
+    static constexpr auto rule = dsl::list(dsl::p<MessageCommentLine>);
+    static constexpr auto value =
+        lexy::as_list<std::vector<std::string>> >> lexy::construct<ast::Comment>;
+};
+
+struct GroupCommentLine : lexy::token_production {
+    // The Group comment may be followed by a resource comment
+    static constexpr auto
+        rule = dsl::peek(LEXY_LIT("##") + (dsl::lit_c<' '> / dsl::eol)) >>
+               LEXY_LIT("##") >>
+               dsl::opt(dsl::lit_c<' '> >> dsl::capture(comment_contents)) + dsl::eol;
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+};
+
+struct GroupComment {
+    static constexpr auto rule = dsl::list(dsl::p<GroupCommentLine>);
+    static constexpr auto value =
+        lexy::as_list<std::vector<std::string>> >> lexy::construct<ast::GroupComment>;
+};
+
+struct ResourceCommentLine : lexy::token_production {
+    static constexpr auto
+        rule = LEXY_LIT("###") >>
+               dsl::opt(dsl::lit_c<' '> >> dsl::capture(comment_contents)) + dsl::eol;
+    static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding>;
+};
+
+struct ResourceComment {
+    static constexpr auto rule = dsl::list(dsl::p<ResourceCommentLine>);
+    static constexpr auto value = lexy::as_list<std::vector<std::string>> >>
+                                  lexy::construct<ast::ResourceComment>;
+};
+
+// CommentLine         ::= ("###" | "##" | "#") ("\u0020" comment_char*)? line_end
+struct Comment : lexy::token_production {
+    static constexpr auto rule =
+        dsl::p<ResourceComment> | dsl::p<GroupComment> | dsl::p<MessageComment>;
+    static constexpr auto value = lexy::construct<ast::AnyComment>;
 };
 
 // Junk                ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
@@ -268,9 +304,9 @@ struct Attributes : lexy::token_production {
 // Term ::= "-" Identifier blank_inline? "=" blank_inline? Pattern Attribute*
 struct Term {
     static constexpr auto whitespace = dsl::lit_c<' '>;
-    static constexpr auto rule = dsl::opt(dsl::p<MessageComment>) + dsl::lit_c<'-'> +
-                                 dsl::p<Identifier> + dsl::lit_c<'='> +
-                                 dsl::p<Pattern> + dsl::p<Attributes> + dsl::newline;
+    static constexpr auto rule =
+        dsl::lit_c<'-'> >> dsl::p<Identifier> + dsl::lit_c<'='> + dsl::p<Pattern> +
+                               dsl::p<Attributes> + dsl::newline;
     static constexpr auto value = lexy::construct<ast::Term>;
 };
 
@@ -281,35 +317,47 @@ struct Message {
         static constexpr auto name =
             "Message must contain at least one pattern or atribute";
     };
+    // FIXME: Use explicit whitespace
     static constexpr auto whitespace = dsl::lit_c<' '>;
     static constexpr auto rule = [] {
-        auto comment = dsl::opt(dsl::p<MessageComment>);
         auto value = dsl::p<Pattern> >> dsl::p<Attributes> | dsl::p<AttributesPlus> |
                      dsl::error<missing_pattern_or_attribute>;
 
-        return comment + dsl::p<Identifier> + dsl::lit_c<'='> + value + dsl::newline;
+        return dsl::p<Identifier> >> dsl::lit_c<'='> + value + dsl::newline;
     }();
     static constexpr auto value = lexy::construct<ast::Message>;
 };
 
 struct Entry : lexy::token_production {
-    static constexpr auto rule = dsl::peek(dsl::p<Term>) >> dsl::p<Term> |
-                                 dsl::peek(dsl::p<Message>) >> dsl::p<Message> |
-                                 dsl::peek(dsl::p<CommentLine>) >> dsl::p<CommentLine> |
-                                 dsl::else_ >> dsl::p<Junk>;
-    static constexpr auto value = lexy::construct<ast::Entry>;
+    static constexpr auto rule = [] {
+        auto comment = dsl::p<Comment>;
+        auto entry = dsl::p<Term> | dsl::p<Message>;
+
+        auto commented_entry =
+            dsl::peek(LEXY_LIT("# ")) >> dsl::p<MessageComment> + dsl::if_(entry);
+
+        // commented_entry must be before comment
+        // since commented_entry is prefixed with part of comment
+        return commented_entry | comment | entry;
+    }();
+    static constexpr auto value =
+        lexy::callback<ast::Entry>([](auto entry) { return entry; },
+                                   [](ast::Comment comment, auto entry) {
+                                       entry.setComment(std::move(comment));
+                                       return entry;
+                                   });
 };
 
 struct Resource {
     static constexpr auto ws = dsl::whitespace(blank_block);
-    static constexpr auto rule =
-        dsl::terminator(dsl::eof).opt_list(ws + dsl::p<Entry> + ws);
+    static constexpr auto rule = dsl::terminator(dsl::eof).opt_list(
+        ws + dsl::try_(dsl::p<Entry>, dsl::p<Junk>) + ws);
     static constexpr auto value = lexy::as_list<std::vector<ast::Entry>>;
 };
 
 } // namespace grammar
 
-std::vector<ast::Entry> parseFile(const std::filesystem::path &filename) {
+std::vector<ast::Entry> parseFile(const std::filesystem::path &filename, bool strict) {
     std::ifstream ifs(filename);
     std::string content((std::istreambuf_iterator<char>(ifs)),
                         (std::istreambuf_iterator<char>()));
@@ -325,21 +373,24 @@ std::vector<ast::Entry> parseFile(const std::filesystem::path &filename) {
 
     auto parse_result =
         lexy::parse<grammar::Resource>(stringInput, lexy_ext::report_error);
-    if (parse_result)
-        return parse_result.value();
-    else
+
+    if (strict && parse_result.is_error() || !strict && parse_result.is_fatal_error()) {
         // FIXME: This should be a more specific error
         throw std::runtime_error("Failed to parse");
+    } else {
+        return parse_result.value();
+    }
 }
 
-std::vector<ast::Entry> parse(std::string &&input) {
+std::vector<ast::Entry> parse(std::string &&input, bool strict) {
     auto parse_result = lexy::parse<grammar::Resource>(
         lexy::string_input<lexy::utf8_encoding>(input), lexy_ext::report_error);
-    if (parse_result)
-        return parse_result.value();
-    else
+
+    if (strict && parse_result.is_error() || !strict && parse_result.is_fatal_error())
         // FIXME: This should be a more specific error
         throw std::runtime_error("Failed to parse");
+    else
+        return parse_result.value();
 }
 
 std::vector<ast::PatternElement> parsePattern(const std::string &input) {

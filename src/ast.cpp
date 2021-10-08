@@ -63,6 +63,16 @@ std::ostream &operator<<(std::ostream &out, const Variable &var) {
     return out;
 }
 
+std::string Comment::getValue() const {
+    std::stringstream result;
+    for (int i = 0; i < this->value.size(); i++) {
+        result << this->value[i];
+        if (i != this->value.size() - 1)
+            result << std::endl;
+    }
+    return result.str();
+}
+
 // The first text element should be stripped to remove leading whitespace
 std::string stripStart(const std::string &str, const std::string &ws = " \r\n") {
     const auto begin = str.find_first_not_of(ws);
@@ -185,28 +195,17 @@ Attribute::Attribute(std::string &&id, std::vector<PatternElement> &&pattern)
     addPattern(std::move(pattern), this->pattern);
 }
 
-Message::Message(std::optional<std::string> &&comment, std::string &&id,
-                 std::optional<std::vector<PatternElement>> &&pattern,
-                 std::vector<Attribute> &&attributes)
+Message::Message(std::string &&id, std::vector<Attribute> &&attributes)
+    : Message(std::move(id), std::vector<PatternElement>(), std::move(attributes)) {}
+
+Message::Message(std::string &&id, std::vector<PatternElement> &&pattern,
+                 std::vector<Attribute> &&attributes, std::optional<Comment> &&comment)
     : comment(std::move(comment)), id(std::move(id)) {
-    if (pattern) {
-        addPattern(std::move(*pattern), this->pattern);
-    }
+    addPattern(std::move(pattern), this->pattern);
     for (ast::Attribute &attribute : attributes) {
         this->attributes.insert(std::make_pair(attribute.getId(), attribute));
     }
 }
-
-Message::Message(std::optional<std::string> &&comment, std::string &&id,
-                 std::vector<Attribute> &&attributes)
-    : Message(std::move(comment), std::move(id), std::vector<PatternElement>(),
-              std::move(attributes)) {}
-
-Message::Message(std::string &&id, std::optional<std::vector<PatternElement>> &&pattern,
-                 std::vector<Attribute> &&attributes,
-                 std::optional<std::string> &&comment)
-    : Message(std::move(comment), std::move(id), std::move(pattern),
-              std::move(attributes)) {}
 
 // FIXME: this might not always be the desired formatter.
 // Do we want the number format to match the localisation, or to always use the
@@ -464,12 +463,53 @@ boost::property_tree::ptree Message::getPropertyTree() const {
     }
     if (this->comment) {
         comment.put("type", "Comment");
-        comment.put("content", *this->comment);
+        comment.put("content", this->comment->getValue());
         message.add_child("comment", comment);
     } else {
         message.put("comment", "null");
     }
     return message;
+}
+
+void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {
+    std::visit(
+        [&parent](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, fluent::ast::Message>) {
+                parent.push_back(std::make_pair("", arg.getPropertyTree()));
+            } else if constexpr (std::is_same_v<T, fluent::ast::Term>) {
+                parent.push_back(std::make_pair("", arg.getPropertyTree()));
+            } else if constexpr (std::is_same_v<T, fluent::ast::AnyComment>) {
+                pt::ptree comment;
+                std::visit(
+                    [&comment](const auto &arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, fluent::ast::Comment>) {
+                            comment.put("type", "Comment");
+                            comment.put("content", arg.getValue());
+                        } else if constexpr (std::is_same_v<
+                                                 T, fluent::ast::GroupComment>) {
+                            comment.put("type", "GroupComment");
+                            comment.put("content", arg.getValue());
+                        } else if constexpr (std::is_same_v<
+                                                 T, fluent::ast::ResourceComment>) {
+                            comment.put("type", "ResourceComment");
+                            comment.put("content", arg.getValue());
+                        } else
+                            static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                    },
+                    arg);
+                parent.push_back(std::make_pair("", comment));
+            } else if constexpr (std::is_same_v<T, fluent::ast::Junk>) {
+                pt::ptree comment;
+                comment.put("type", "Junk");
+                comment.put("annotations", "");
+                comment.put("content", arg.value);
+                parent.push_back(std::make_pair("", comment));
+            } else
+                static_assert(always_false_v<T>, "non-exhaustive visitor!");
+        },
+        entry);
 }
 #endif
 
