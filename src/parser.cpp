@@ -69,8 +69,7 @@ static constexpr auto indented_char =
 
 // \r is not considered a newline, but may appear by itself in the text
 // So if a \r is read, we must peek and see if it's followed by a \n
-static constexpr auto comment_contents =
-    dsl::while_(dsl::code_point - dsl::ascii::newline);
+static constexpr auto comment_contents = dsl::while_(dsl::code_point - dsl::newline);
 
 struct MessageCommentLine : lexy::token_production {
     // The Message comment may be followed by a group comment
