@@ -328,6 +328,11 @@ const std::string formatPattern(
                         // FIXME: This could probably be handled better
                         values << "unknown message " << arg;
                     }
+                } else if constexpr (std::is_same_v<T, SelectExpression>) {
+                    std::string selector =
+                        formatPattern(arg.selector, args, messageLookup, termLookup);
+                    values << formatPattern(arg.find(selector), args, messageLookup,
+                                            termLookup);
                 } else if constexpr (std::is_same_v<T, VariableReference>)
                     values << formatVariable(args.at(arg.identifier));
                 else
@@ -419,6 +424,8 @@ pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
                     elements.push_back(std::make_pair("", arg.getPropertyTree()));
                 } else if constexpr (std::is_same_v<T, TermReference>) {
                     elements.push_back(std::make_pair("", arg.getPropertyTree()));
+                } else if constexpr (std::is_same_v<T, SelectExpression>) {
+                    elements.push_back(std::make_pair("", arg.getPropertyTree()));
                 } else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
@@ -471,6 +478,44 @@ boost::property_tree::ptree Message::getPropertyTree() const {
         message.put("comment", "null");
     }
     return message;
+}
+
+pt::ptree SelectExpression::getPropertyTree() const {
+    pt::ptree root, expression;
+    root.put("type", "Placeable");
+    expression.put("type", "SelectExpression");
+    pt::ptree selector =
+        getPatternPropertyTree(this->selector).get_child("elements").back().second;
+    expression.add_child("selector", selector);
+    pt::ptree variants;
+    for (size_t i = 0; i < this->variants.size(); i++) {
+        pt::ptree varTree, key;
+        varTree.put("type", "Variant");
+
+        std::visit(
+            [&key](const auto &arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    key.put("type", "Identifier");
+                    key.put("value", arg);
+                } else if constexpr (std::is_same_v<T, NumberLiteral>) {
+                    key.put("type", "NumberLiteral");
+                    key.put("value", arg.value);
+                }
+            },
+            this->variants[i].first);
+        varTree.add_child("key", key);
+        varTree.add_child("value", getPatternPropertyTree(this->variants[i].second));
+
+        if (this->defaultVariant == i)
+            varTree.put("default", true);
+        else
+            varTree.put("default", false);
+        variants.push_back(std::make_pair("", varTree));
+    }
+    expression.add_child("variants", variants);
+    root.add_child("expression", expression);
+    return root;
 }
 
 void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {

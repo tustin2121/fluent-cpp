@@ -27,11 +27,14 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
+#include <algorithm>
 #include <string>
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include <limits>
 #ifdef TEST
 #include <boost/property_tree/ptree.hpp>
 #endif
@@ -113,11 +116,66 @@ struct NumberLiteral {
      * \brief Localises number literal
      */
     const std::string format() const;
+
+    bool operator==(const NumberLiteral &other) const {
+        double a = stod(this->value), b = stod(other.value);
+        return std::abs(a - b) <
+               std::abs(std::min(a, b)) * std::numeric_limits<double>::epsilon();
+    }
+};
+
+typedef std::variant<std::string, NumberLiteral> VariantKey;
+
+/**
+ * \class SelectExpression
+ * \brief An expression matching against some input
+ *
+ * E.g. ``{ $value ->
+ *   [0] No things
+ *   [1] One thing
+ *   *[other] Some things
+ * }``
+ */
+struct SelectExpression {
+    typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReference,
+                         MessageReference, TermReference, SelectExpression>
+        PatternElement;
+
+    // Note: this only stores one, but is easier to work with than unique_ptr
+    // It also allows it to be treated as a Pattern
+    std::vector<PatternElement> selector;
+    typedef std::pair<VariantKey, std::vector<PatternElement>> VariantType;
+    // Note Stored internally as a vector since there are usually only a small number of
+    // variants and we would prefer to preserve the original ordering.
+    std::vector<VariantType> variants;
+    size_t defaultVariant;
+
+    SelectExpression(PatternElement &&selector, std::vector<VariantType> &&firstVariants,
+                     VariantType &&defaultVariant, std::vector<VariantType> &&lastVariants)
+        : variants(std::move(firstVariants)) {
+        this->selector.push_back(std::move(selector));
+        this->defaultVariant = variants.size();
+        this->variants.push_back(std::move(defaultVariant));
+        this->variants.insert(this->variants.end(), lastVariants.begin(),
+                             lastVariants.end());
+    }
+
+    const std::vector<PatternElement> &find(const VariantKey key) const {
+        auto it = std::find_if(this->variants.begin(), this->variants.end(), [&key](auto elem) { return elem.first == key; });
+        if (it != this->variants.end())
+            return it->second;
+        return this->variants[this->defaultVariant].second;
+    }
+
+#ifdef TEST
+    boost::property_tree::ptree getPropertyTree() const;
+#endif
 };
 
 typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReference,
-                     MessageReference, TermReference>
+                     MessageReference, TermReference, SelectExpression>
     PatternElement;
+
 /**
  *  \typedef Variable
  *  \brief data which may be passed as an argument when formatting messages.
