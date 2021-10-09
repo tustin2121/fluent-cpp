@@ -250,12 +250,91 @@ struct InlineExpression {
     static constexpr auto value = lexy::construct<ast::PatternElement>;
 };
 
+// Selectors are like InlineExpressions, but cannot have nested placeables
+struct Selector {
+    struct expected_expression {
+        static LEXY_CONSTEVAL auto name() { return "expected expression"; }
+    };
+    // Note: order is necessary for parsing
+    static constexpr auto rule = [] {
+        return dsl::p<StringLiteral> | dsl::p<NumberLiteral> |
+               dsl::p<MessageReference> | dsl::p<TermReference> |
+               dsl::p<VariableReference>;
+    }();
+    static constexpr auto value = lexy::construct<ast::PatternElement>;
+};
+
+struct Pattern;
+
+struct VariantKey {
+    static constexpr auto rule = dsl::lit_c<'['> >> opt_blank +
+                                                        (dsl::p<NumberLiteral> |
+                                                         dsl::p<Identifier>)+opt_blank
+                                                        + dsl::lit_c<']'>;
+    // Not sure if this needs to be anything other than a string, but NumberLiteral
+    // doesn't produce one
+    static constexpr auto value = lexy::construct<ast::VariantKey>;
+};
+
+// Variant             ::= line_end blank? VariantKey blank_inline? Pattern
+struct Variant {
+    static constexpr auto rule = dsl::peek(dsl::newline + opt_blank +
+                                           dsl::lit_c<'['>) >>
+                                 dsl::newline + opt_blank + dsl::p<VariantKey> +
+                                     dsl::if_(blank_inline) + dsl::recurse<Pattern>;
+    static constexpr auto value =
+        lexy::construct<std::pair<ast::VariantKey, std::vector<ast::PatternElement>>>;
+};
+
+// DefaultVariant      ::= line_end blank? "*" VariantKey blank_inline? Pattern
+struct DefaultVariant {
+    static constexpr auto rule = dsl::newline >>
+                                 opt_blank + dsl::lit_c<'*'> + dsl::p<VariantKey> +
+                                     dsl::if_(blank_inline) + dsl::recurse<Pattern>;
+    static constexpr auto value =
+        lexy::construct<std::pair<ast::VariantKey, std::vector<ast::PatternElement>>>;
+};
+
+struct Variants {
+    static constexpr auto rule = dsl::opt(dsl::list(dsl::p<Variant>));
+    static constexpr auto value = lexy::as_list<
+        std::vector<std::pair<ast::VariantKey, std::vector<ast::PatternElement>>>>;
+};
+
+// FIXME: We could probably parse SelectExpression and InlineExpression together, such
+// that if it's followed by a -> it gets turned into a SelectExpression, otherwise it's
+// just an InlineExpression. It would remove the unnecessary peek
+//
+// SelectExpression ::= InlineExpression blank? "->" blank_inline? variant_list
+struct SelectExpression {
+    struct inline_placeable_error {
+        static constexpr auto name = "Nested placeables are not valid selectors";
+    };
+    static constexpr auto rule = [] {
+        // Include InlineExressions in the peek so that we can produce a better error
+        // if an inline_placeable is used as a selector
+        // FIXME: Can we provide a better error message if someone tries to use a
+        // Select Expression as a selector?
+        auto peek_prefix = dsl::p<InlineExpression> + opt_blank + LEXY_LIT("->");
+        auto prefix =
+            dsl::p<Selector> | dsl::else_ >> dsl::error<inline_placeable_error> +
+                                                 opt_blank + LEXY_LIT("->");
+        // variant_list        ::= Variant* DefaultVariant Variant* line_end
+        auto variant_list =
+            dsl::p<Variants> + dsl::p<DefaultVariant> + dsl::p<Variants> + dsl::eol;
+        return dsl::peek(peek_prefix) >> prefix + dsl::if_(blank_inline) + variant_list;
+    }();
+    static constexpr auto value =
+        lexy::construct<ast::SelectExpression> | lexy::construct<ast::PatternElement>;
+};
+
 // inline_placeable    ::= "{" blank? (SelectExpression | InlineExpression) blank? "}"
 struct inline_placeable : lexy::token_production {
-    // FIXME: Add Select Expression
-    static constexpr auto rule = dsl::lit_c<'{'> >> opt_blank +
-                                                        dsl::p<InlineExpression> +
-                                                        opt_blank + dsl::lit_c<'}'>;
+    static constexpr auto rule = dsl::lit_c<'{'> >>
+                                 opt_blank +
+                                     (dsl::p<SelectExpression> |
+                                      dsl::else_ >> dsl::p<InlineExpression>)+opt_blank
+                                     + dsl::lit_c<'}'>;
     static constexpr auto value = lexy::forward<ast::PatternElement>;
 };
 
