@@ -209,7 +209,11 @@ struct NumberLiteral : lexy::token_production {
     static constexpr auto rule = [] {
         auto digits = dsl::digits<>;
         auto decimal = dsl::if_(dsl::lit_c<'.'> >> digits);
-        return dsl::capture(dsl::lit_c<'-'> >> digits >> decimal | digits >> decimal);
+        // Peek is necessary to ensure that negative NumberLiterals can be distinguised
+        // from terms Note that the Term doesn't peek, as it is is processed after we
+        // have eliminated the possibility of a NumberLiteral
+        return dsl::peek(dsl::lit_c<'-'> >> dsl::ascii::digit | dsl::ascii::digit) >>
+               dsl::capture(dsl::lit_c<'-'> >> digits >> decimal | digits >> decimal);
     }();
     static constexpr auto value = lexy::as_string<std::string, lexy::utf8_encoding> |
                                   lexy::construct<ast::NumberLiteral>;
