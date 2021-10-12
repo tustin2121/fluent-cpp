@@ -13,3 +13,9 @@ indentation-with-expression =
 
     {"Bar"}
         Baz
+
+select = { $num ->
+    [0.0] Nothing
+    [1] One thing
+    *[other] Some things
+}

@@ -329,8 +329,10 @@ const std::string formatPattern(
                         values << "unknown message " << arg;
                     }
                 } else if constexpr (std::is_same_v<T, SelectExpression>) {
-                    std::string input = formatPattern(arg.selector, args, messageLookup, termLookup);
-                    values << formatPattern(arg.find(input), args, messageLookup, termLookup);
+                    std::string selector =
+                        formatPattern(arg.selector, args, messageLookup, termLookup);
+                    values << formatPattern(arg.find(selector), args, messageLookup,
+                                            termLookup);
                 } else if constexpr (std::is_same_v<T, VariableReference>)
                     values << formatVariable(args.at(arg.identifier));
                 else
@@ -482,7 +484,8 @@ pt::ptree SelectExpression::getPropertyTree() const {
     pt::ptree root, expression;
     root.put("type", "Placeable");
     expression.put("type", "SelectExpression");
-    pt::ptree selector = getPatternPropertyTree(this->selector).get_child("elements").back().second;
+    pt::ptree selector =
+        getPatternPropertyTree(this->selector).get_child("elements").back().second;
     expression.add_child("selector", selector);
     pt::ptree variants;
     for (size_t i = 0; i < this->variants.size(); i++) {
@@ -499,7 +502,8 @@ pt::ptree SelectExpression::getPropertyTree() const {
                     key.put("type", "NumberLiteral");
                     key.put("value", arg.value);
                 }
-            }, this->variants[i].first);
+            },
+            this->variants[i].first);
         varTree.add_child("key", key);
         varTree.add_child("value", getPatternPropertyTree(this->variants[i].second));
 

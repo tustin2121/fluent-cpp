@@ -320,9 +320,9 @@ struct SelectExpression {
         // FIXME: Can we provide a better error message if someone tries to use a
         // Select Expression as a selector?
         auto peek_prefix = dsl::p<InlineExpression> + opt_blank + LEXY_LIT("->");
-        auto prefix =
-            dsl::p<Selector> | dsl::else_ >> dsl::error<inline_placeable_error> +
-                                                 opt_blank + LEXY_LIT("->");
+        auto prefix = (dsl::p<Selector> |
+                       dsl::else_ >> dsl::error<inline_placeable_error>)+opt_blank +
+                      LEXY_LIT("->");
         // variant_list        ::= Variant* DefaultVariant Variant* line_end
         auto variant_list =
             dsl::p<Variants> + dsl::p<DefaultVariant> + dsl::p<Variants> + dsl::eol;

@@ -48,3 +48,6 @@ TEST(TestStatic, Indentation) { check_result("indentation", {}, "Foo\n    Bar");
 TEST(TestStatic, IndentationWithExpression) {
     check_result("indentation-with-expression", {}, "Foo\n\nBar\n    Baz");
 }
+TEST(TestStatic, SelectZero) { check_result("select", {{"num", 0}}, "Nothing"); }
+TEST(TestStatic, SelectOne) { check_result("select", {{"num", 1.0}}, "One thing"); }
+TEST(TestStatic, SelectMany) { check_result("select", {{"num", 2}}, "Some things"); }
