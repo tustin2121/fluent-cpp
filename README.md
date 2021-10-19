@@ -6,7 +6,7 @@
 
 fluent-cpp is a C++ library which aims to implement [Project Fluent](https://projectfluent.org/).
 
-It is currently under development, highly unstable and only currently lacks support for Select expressions, parameterized Terms, and references to built-in functions.
+It is currently under development, highly unstable and currently lacks support for parameterized Terms, and references to built-in functions.
 
 ## Usage
 
