@@ -48,7 +48,7 @@ class FluentLoader {
     void addResource(const icu::Locale locId, std::vector<ast::Entry> &&entries);
     void addResource(const icu::Locale locId, std::string &&input);
 
-    std::optional<ast::Message>
+    std::optional<std::pair<ast::Message, icu::Locale>>
     getMessage(const std::vector<icu::Locale> &locIdFallback,
                const std::string &resId) const;
 

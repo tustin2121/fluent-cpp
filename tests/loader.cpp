@@ -51,3 +51,15 @@ TEST(TestStatic, IndentationWithExpression) {
 TEST(TestStatic, SelectZero) { check_result("select", {{"num", 0}}, "Nothing"); }
 TEST(TestStatic, SelectOne) { check_result("select", {{"num", 1.0}}, "One thing"); }
 TEST(TestStatic, SelectMany) { check_result("select", {{"num", 2}}, "Some things"); }
+TEST(TestStatic, SelectOneCLDR) {
+    check_result("select-cldr-plural", {{"num", 1}}, "One thing");
+}
+TEST(TestStatic, SelectManyCLDR) {
+    check_result("select-cldr-plural", {{"num", 1.0}}, "One thing");
+}
+TEST(TestStatic, SelectLiteralNum) {
+    check_result("select-literal-num", {}, "One thing");
+}
+TEST(TestStatic, SelectLiteralString) {
+    check_result("select-literal-string", {}, "Some things");
+}
