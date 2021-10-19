@@ -25,19 +25,20 @@
 #ifndef AST_HPP_INCLUDED
 #define AST_HPP_INCLUDED
 
+#include <algorithm>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
-#include <algorithm>
 #include <string>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <limits>
 #ifdef TEST
 #include <boost/property_tree/ptree.hpp>
 #endif
+#include <unicode/locid.h>
 
 #include <iostream>
 
@@ -118,12 +119,33 @@ struct NumberLiteral {
     const std::string format() const;
 
     bool operator==(const NumberLiteral &other) const {
-        double a = stod(this->value), b = stod(other.value);
-        return std::abs(a - b) <
+        return *this == stod(other.value);
+    }
+
+    bool operator==(const double &other) const {
+        double a = stod(this->value), b = other;
+        return std::abs(a - b) <=
                std::abs(std::min(a, b)) * std::numeric_limits<double>::epsilon();
+    }
+
+    bool operator==(const long &other) const {
+        return *this == static_cast<double>(other);
+    }
+
+    std::variant<long, double> getValue() const {
+        if (this->value.find(".") != std::string::npos) {
+            return std::variant<long, double>(stod(value));
+        } else {
+            return std::variant<long, double>(stol(value));
+        }
     }
 };
 
+/**
+ *  \typedef Variable
+ *  \brief data which may be passed as an argument when formatting messages.
+ */
+typedef std::variant<std::string, long, double> Variable;
 typedef std::variant<std::string, NumberLiteral> VariantKey;
 
 /**
@@ -150,22 +172,24 @@ struct SelectExpression {
     std::vector<VariantType> variants;
     size_t defaultVariant;
 
-    SelectExpression(PatternElement &&selector, std::vector<VariantType> &&firstVariants,
-                     VariantType &&defaultVariant, std::vector<VariantType> &&lastVariants)
+    SelectExpression(PatternElement &&selector,
+                     std::vector<VariantType> &&firstVariants,
+                     VariantType &&defaultVariant,
+                     std::vector<VariantType> &&lastVariants)
         : variants(std::move(firstVariants)) {
         this->selector.push_back(std::move(selector));
         this->defaultVariant = variants.size();
         this->variants.push_back(std::move(defaultVariant));
         this->variants.insert(this->variants.end(), lastVariants.begin(),
-                             lastVariants.end());
+                              lastVariants.end());
     }
 
-    const std::vector<PatternElement> &find(const VariantKey key) const {
-        auto it = std::find_if(this->variants.begin(), this->variants.end(), [&key](auto elem) { return elem.first == key; });
-        if (it != this->variants.end())
-            return it->second;
-        return this->variants[this->defaultVariant].second;
-    }
+    const std::vector<PatternElement> &find(const icu::Locale &locid,
+                                            const std::string key) const;
+    const std::vector<PatternElement> &find(const icu::Locale &locid,
+                                            const double key) const;
+    const std::vector<PatternElement> &find(const icu::Locale &locid,
+                                            const long key) const;
 
 #ifdef TEST
     boost::property_tree::ptree getPropertyTree() const;
@@ -175,12 +199,6 @@ struct SelectExpression {
 typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReference,
                      MessageReference, TermReference, SelectExpression>
     PatternElement;
-
-/**
- *  \typedef Variable
- *  \brief data which may be passed as an argument when formatting messages.
- */
-typedef std::variant<std::string, long, double> Variable;
 
 /**
  * \class Comment
@@ -253,7 +271,7 @@ struct Attribute {
     Attribute(std::string &&id, std::vector<PatternElement> &&pattern);
 
     const std::string format(
-        const std::map<std::string, Variable> &args,
+        const icu::Locale &locId, const std::map<std::string, Variable> &args,
         const std::function<std::optional<Message>(const std::string &)> messageLookup,
         const std::function<std::optional<Term>(const std::string &)> termLookup) const;
 };
@@ -297,7 +315,7 @@ class Message {
             std::optional<Comment> &&comment = std::optional<Comment>());
 
     const std::string format(
-        const std::map<std::string, Variable> &args,
+        const icu::Locale &locId, const std::map<std::string, Variable> &args,
         const std::function<std::optional<Message>(const std::string &)> messageLookup,
         const std::function<std::optional<Term>(const std::string &)> termLookup) const;
 

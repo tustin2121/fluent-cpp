@@ -281,8 +281,102 @@ const std::string formatVariable(const Variable &variable) {
         variable);
 }
 
+const std::vector<PatternElement> &SelectExpression::find(const icu::Locale &locid,
+                                                          const std::string key) const {
+    auto it =
+        std::find_if(this->variants.begin(), this->variants.end(), [&key](auto elem) {
+            return std::visit(
+                [&](const auto &arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        return arg == key;
+                    } else {
+                        return false;
+                    }
+                },
+                elem.first);
+        });
+    if (it != this->variants.end())
+        return it->second;
+    return this->variants[this->defaultVariant].second;
+}
+
+const std::vector<PatternElement> &SelectExpression::find(const icu::Locale &locid,
+                                                          const double key) const {
+    icu::ErrorCode status;
+    icu::PluralRules *pluralRules = icu::PluralRules::forLocale(locid, status);
+    auto it =
+        std::find_if(this->variants.begin(), this->variants.end(), [&](auto elem) {
+            return std::visit(
+                [&](const auto &arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        std::string buffer;
+                        return pluralRules->select(key).toUTF8String(buffer) == arg;
+                    } else if constexpr (std::is_same_v<T, ast::NumberLiteral>) {
+                        return arg == key;
+                    } else {
+                        static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                    }
+                },
+                elem.first);
+        });
+    if (it != this->variants.end())
+        return it->second;
+    return this->variants[this->defaultVariant].second;
+}
+
+const std::vector<PatternElement> &SelectExpression::find(const icu::Locale &locid,
+                                                          const long key) const {
+    icu::ErrorCode status;
+    icu::PluralRules *pluralRules = icu::PluralRules::forLocale(locid, status);
+    auto it =
+        std::find_if(this->variants.begin(), this->variants.end(), [&](auto elem) {
+            return std::visit(
+                [&](const auto &arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        std::string buffer;
+                        return pluralRules->select(static_cast<int32_t>(key))
+                                   .toUTF8String(buffer) == arg;
+                    } else if constexpr (std::is_same_v<T, ast::NumberLiteral>) {
+                        return arg == key;
+                    } else {
+                        static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                    }
+                },
+                elem.first);
+        });
+    if (it != this->variants.end())
+        return it->second;
+    return this->variants[this->defaultVariant].second;
+}
+
+const std::vector<PatternElement>
+getSelectExpressionPattern(const icu::Locale &locid, const SelectExpression &expr,
+                           const std::map<std::string, Variable> &args) {
+    return std::visit(
+        [&](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, ast::StringLiteral>) {
+                return expr.find(locid, arg.value);
+            } else if constexpr (std::is_same_v<T, ast::NumberLiteral>) {
+                return std::visit(
+                    [&](const auto &value) { return expr.find(locid, value); },
+                    arg.getValue());
+            } else if constexpr (std::is_same_v<T, ast::VariableReference>) {
+                return std::visit(
+                    [&](const auto &value) { return expr.find(locid, value); },
+                    args.at(arg.identifier));
+            } else { // else invalid selector.
+                return std::vector<PatternElement>();
+            }
+        },
+        expr.selector[0]);
+}
+
 const std::string formatPattern(
-    const std::vector<ast::PatternElement> &pattern,
+    const icu::Locale &locid, const std::vector<ast::PatternElement> &pattern,
     const std::map<std::string, Variable> &args,
     const std::function<std::optional<Message>(const std::string &)> messageLookup,
     const std::function<std::optional<Term>(const std::string &)> termLookup) {
@@ -304,10 +398,11 @@ const std::string formatPattern(
                         if (arg.attribute) {
                             std::optional<Attribute> attribute =
                                 message->getAttribute(*arg.attribute);
-                            values
-                                << attribute->format(args, messageLookup, termLookup);
+                            values << attribute->format(locid, args, messageLookup,
+                                                        termLookup);
                         } else {
-                            values << message->format(args, messageLookup, termLookup);
+                            values << message->format(locid, args, messageLookup,
+                                                      termLookup);
                         }
                     } else {
                         // FIXME: This could probably be handled better
@@ -320,19 +415,20 @@ const std::string formatPattern(
                         if (arg.attribute) {
                             std::optional<Attribute> attribute =
                                 term->getAttribute(*arg.attribute);
-                            values << attribute->format({}, messageLookup, termLookup);
+                            values << attribute->format(locid, {}, messageLookup,
+                                                        termLookup);
                         } else {
-                            values << term->format({}, messageLookup, termLookup);
+                            values
+                                << term->format(locid, {}, messageLookup, termLookup);
                         }
                     } else {
                         // FIXME: This could probably be handled better
                         values << "unknown message " << arg;
                     }
                 } else if constexpr (std::is_same_v<T, SelectExpression>) {
-                    std::string selector =
-                        formatPattern(arg.selector, args, messageLookup, termLookup);
-                    values << formatPattern(arg.find(selector), args, messageLookup,
-                                            termLookup);
+                    values << formatPattern(
+                        locid, getSelectExpressionPattern(locid, arg, args), args,
+                        messageLookup, termLookup);
                 } else if constexpr (std::is_same_v<T, VariableReference>)
                     values << formatVariable(args.at(arg.identifier));
                 else
@@ -344,17 +440,17 @@ const std::string formatPattern(
 }
 
 const std::string Attribute::format(
-    const std::map<std::string, Variable> &args,
+    const icu::Locale &locid, const std::map<std::string, Variable> &args,
     const std::function<std::optional<Message>(const std::string &)> messageLookup,
     const std::function<std::optional<Term>(const std::string &)> termLookup) const {
-    return formatPattern(this->pattern, args, messageLookup, termLookup);
+    return formatPattern(locid, this->pattern, args, messageLookup, termLookup);
 }
 
 const std::string Message::format(
-    const std::map<std::string, Variable> &args,
+    const icu::Locale &locid, const std::map<std::string, Variable> &args,
     const std::function<std::optional<Message>(const std::string &)> messageLookup,
     const std::function<std::optional<Term>(const std::string &)> termLookup) const {
-    return formatPattern(this->pattern, args, messageLookup, termLookup);
+    return formatPattern(locid, this->pattern, args, messageLookup, termLookup);
 }
 
 #ifdef TEST

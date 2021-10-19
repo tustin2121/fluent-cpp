@@ -113,7 +113,7 @@ void FluentLoader::addDirectory(const std::string &dir,
     }
 }
 
-optional<ast::Message>
+optional<std::pair<ast::Message, icu::Locale>>
 FluentLoader::getMessage(const std::vector<icu::Locale> &locIdFallback,
                          const string &resId) const {
     for (icu::Locale locId : locIdFallback) {
@@ -121,10 +121,10 @@ FluentLoader::getMessage(const std::vector<icu::Locale> &locIdFallback,
         if (result != this->bundles.end()) {
             auto message = result->second.getMessage(resId);
             if (message)
-                return message;
+                return std::make_optional(std::make_pair(*message, locId));
         }
     }
-    return optional<ast::Message>();
+    return optional<std::pair<ast::Message, icu::Locale>>();
 }
 
 optional<ast::Term> FluentLoader::getTerm(const std::vector<icu::Locale> &locIdFallback,
@@ -146,7 +146,10 @@ FluentLoader::formatMessage(const std::vector<icu::Locale> &locIdFallback,
                             const std::map<string, ast::Variable> &args) const {
     function<optional<ast::Message>(const string &)> messageLookup =
         [&](const string &identifier) {
-            return this->getMessage(locIdFallback, identifier);
+            auto messagePair = this->getMessage(locIdFallback, identifier);
+            if (messagePair)
+                return std::make_optional(messagePair->first);
+            return std::optional<ast::Message>();
         };
     function<optional<ast::Term>(const string &)> termLookup =
         [&](const string &identifier) {
@@ -154,18 +157,20 @@ FluentLoader::formatMessage(const std::vector<icu::Locale> &locIdFallback,
         };
 
     ast::MessageReference messageRef = parseMessageReference(resId);
-    auto message = this->getMessage(locIdFallback, messageRef.identifier);
-    if (message) {
+    auto messagePair = this->getMessage(locIdFallback, messageRef.identifier);
+    if (messagePair) {
+        ast::Message message = messagePair->first;
+        icu::Locale locid = messagePair->second;
         if (messageRef.attribute) {
             std::optional<ast::Attribute> attr =
-                message->getAttribute(*messageRef.attribute);
+                message.getAttribute(*messageRef.attribute);
             if (attr) {
                 return optional(
-                    attr->format(std::move(args), messageLookup, termLookup));
+                    attr->format(locid, std::move(args), messageLookup, termLookup));
             }
         } else {
             return optional(
-                message->format(std::move(args), messageLookup, termLookup));
+                message.format(locid, std::move(args), messageLookup, termLookup));
         }
     }
     return optional<string>();

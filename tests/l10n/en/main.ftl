@@ -19,3 +19,21 @@ select = { $num ->
     [1] One thing
     *[other] Some things
 }
+
+select-cldr-plural = { $num ->
+    [0] Nothing
+    [one] One thing
+    *[other] Some things
+}
+
+select-literal-num = { 1.0 ->
+    [0] Nothing
+    [one] One thing
+    *[other] Some things
+}
+
+select-literal-string = { "1.0" ->
+    [0] Nothing
+    [one] One thing
+    *[other] Some things
+}
