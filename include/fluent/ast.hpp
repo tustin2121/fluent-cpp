@@ -116,7 +116,7 @@ struct NumberLiteral {
     /**
      * \brief Localises number literal
      */
-    const std::string format() const;
+    const std::string format(const icu::Locale &locid) const;
 
     bool operator==(const NumberLiteral &other) const {
         return *this == stod(other.value);

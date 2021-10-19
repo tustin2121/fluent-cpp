@@ -209,28 +209,24 @@ Message::Message(std::string &&id, std::vector<PatternElement> &&pattern,
     }
 }
 
-// FIXME: this might not always be the desired formatter.
-// Do we want the number format to match the localisation, or to always use the
-// locale-specific format?
-static const icu::number::LocalizedNumberFormatter NUMBER_FORMATTER =
-    icu::number::NumberFormatter::withLocale(icu::Locale());
-
-const std::string NumberLiteral::format() const {
+const std::string NumberLiteral::format(const icu::Locale &locid) const {
+    static const icu::number::LocalizedNumberFormatter formatter =
+        icu::number::NumberFormatter::withLocale(locid);
     icu::ErrorCode status;
     std::string buffer;
 
     size_t decimalPos = this->value.find_first_of(".");
     std::string result;
     if (decimalPos == std::string::npos) {
-        result = NUMBER_FORMATTER.formatInt(stol(this->value), status)
+        result = formatter.formatInt(stol(this->value), status)
                      .toString(status)
                      .toUTF8String(buffer);
     } else {
         size_t significantDigits = this->value.size() - decimalPos - 1;
-        auto formatter = NUMBER_FORMATTER.precision(
-            icu::number::Precision::minFraction(significantDigits));
 
-        return formatter.formatDouble(stod(this->value), status)
+        return formatter
+            .precision(icu::number::Precision::minFraction(significantDigits))
+            .formatDouble(stod(this->value), status)
             .toString(status)
             .toUTF8String(buffer);
     }
@@ -245,7 +241,7 @@ const std::string NumberLiteral::format() const {
     }
 }
 
-const std::string formatVariable(const Variable &variable) {
+const std::string formatVariable(const icu::Locale &locid, const Variable &variable) {
     std::string buffer;
     return std::visit(
         [&](const auto &arg) {
@@ -254,7 +250,8 @@ const std::string formatVariable(const Variable &variable) {
                 return arg;
             } else if constexpr (std::is_same_v<T, long>) {
                 icu::ErrorCode status;
-                std::string result = NUMBER_FORMATTER.formatInt(arg, status)
+                std::string result = icu::number::NumberFormatter::withLocale(locid)
+                                         .formatInt(arg, status)
                                          .toString(status)
                                          .toUTF8String(buffer);
                 if (status.isSuccess()) {
@@ -266,7 +263,8 @@ const std::string formatVariable(const Variable &variable) {
                 }
             } else if constexpr (std::is_same_v<T, double>) {
                 icu::ErrorCode status;
-                std::string result = NUMBER_FORMATTER.formatDouble(arg, status)
+                std::string result = icu::number::NumberFormatter::withLocale(locid)
+                                         .formatDouble(arg, status)
                                          .toString(status)
                                          .toUTF8String(buffer);
                 if (status.isSuccess()) {
@@ -391,7 +389,7 @@ const std::string formatPattern(
                 else if constexpr (std::is_same_v<T, StringLiteral>)
                     values << arg.value;
                 else if constexpr (std::is_same_v<T, NumberLiteral>) {
-                    values << arg.format();
+                    values << arg.format(locid);
                 } else if constexpr (std::is_same_v<T, MessageReference>) {
                     auto message = messageLookup(arg.identifier);
                     if (message) {
@@ -430,7 +428,7 @@ const std::string formatPattern(
                         locid, getSelectExpressionPattern(locid, arg, args), args,
                         messageLookup, termLookup);
                 } else if constexpr (std::is_same_v<T, VariableReference>)
-                    values << formatVariable(args.at(arg.identifier));
+                    values << formatVariable(locid, args.at(arg.identifier));
                 else
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
             },
