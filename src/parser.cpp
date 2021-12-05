@@ -233,6 +233,8 @@ struct StringLiteral : lexy::token_production {
                                   lexy::construct<ast::StringLiteral>;
 };
 
+struct inline_placeable;
+
 // InlineExpression    ::= StringLiteral | NumberLiteral | FunctionReference |
 // MessageReference | TermReference | VariableReference | inline_placeable
 struct InlineExpression {
@@ -241,14 +243,9 @@ struct InlineExpression {
     };
     // Note: order is necessary for parsing
     static constexpr auto rule = [] {
-        // Note: since recurse does not produce a branch rule, we must inline
-        // inline_placeable here
-        auto inline_placeable = dsl::lit_c<'{'> >> opt_blank +
-                                                       dsl::recurse<InlineExpression> +
-                                                       opt_blank + dsl::lit_c<'}'>;
         return dsl::p<StringLiteral> | dsl::p<NumberLiteral> |
                dsl::p<MessageReference> | dsl::p<TermReference> |
-               dsl::p<VariableReference> | inline_placeable |
+               dsl::p<VariableReference> | dsl::recurse_branch<inline_placeable> |
                dsl::error<expected_expression>;
     }();
     static constexpr auto value = lexy::construct<ast::PatternElement>;
@@ -315,18 +312,17 @@ struct SelectExpression {
         static constexpr auto name = "Nested placeables are not valid selectors";
     };
     static constexpr auto rule = [] {
-        // Include InlineExressions in the peek so that we can produce a better error
-        // if an inline_placeable is used as a selector
+        // FIXME: It used to be possible to recursively peek meaning that
+        // InlineExpression could be peeked here, and filtered to Selector after the
+        // peek, to provide a more helpful error message about using nested placeables
+        // as selectors, however lexy no longer allows recursive peeks.
         // FIXME: Can we provide a better error message if someone tries to use a
         // Select Expression as a selector?
-        auto peek_prefix = dsl::p<InlineExpression> + opt_blank + LEXY_LIT("->");
-        auto prefix = (dsl::p<Selector> |
-                       dsl::else_ >> dsl::error<inline_placeable_error>)+opt_blank +
-                      LEXY_LIT("->");
+        auto prefix = dsl::p<Selector> + opt_blank + LEXY_LIT("->");
         // variant_list        ::= Variant* DefaultVariant Variant* line_end
         auto variant_list =
             dsl::p<Variants> + dsl::p<DefaultVariant> + dsl::p<Variants> + dsl::eol;
-        return dsl::peek(peek_prefix) >> prefix + dsl::if_(blank_inline) + variant_list;
+        return dsl::peek(prefix) >> prefix + dsl::if_(blank_inline) + variant_list;
     }();
     static constexpr auto value =
         lexy::construct<ast::SelectExpression> | lexy::construct<ast::PatternElement>;
