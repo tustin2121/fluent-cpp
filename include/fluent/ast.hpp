@@ -71,20 +71,6 @@ struct MessageReference {
 };
 
 /**
- *  \class TermReference
- *  \brief A reference to a Term within an expression.
- */
-struct TermReference : public MessageReference {
-    using MessageReference::MessageReference;
-
-#ifdef TEST
-  public:
-    boost::property_tree::ptree getPropertyTree() const override;
-    std::string getPropertyTreeType() const override { return "TermReference"; }
-#endif
-};
-
-/**
  * \class StringLiteral
  * \brief A string literal enclosed in an expression, often used for escaping values
  *
@@ -142,6 +128,53 @@ struct NumberLiteral {
 };
 
 /**
+ *  \class NamedArgument
+ *  \brief A named argument passed to a function or term
+ */
+struct NamedArgument {
+    std::string identifier;
+    std::variant<StringLiteral, NumberLiteral> value;
+    NamedArgument(std::string &&identifier,
+                  std::variant<StringLiteral, NumberLiteral> &&value)
+        : identifier(std::move(identifier)), value(std::move(value)) {}
+};
+
+struct TermReference;
+struct SelectExpression;
+
+typedef std::variant<StringLiteral, NumberLiteral, VariableReference, MessageReference,
+                     TermReference, SelectExpression>
+    InlineExpression;
+
+typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReference,
+                     MessageReference, TermReference, SelectExpression>
+    PatternElement;
+// FIXME: Should really be InlineExpression
+typedef std::variant<NamedArgument, PatternElement> Argument;
+
+/**
+ *  \class TermReference
+ *  \brief A reference to a Term within an expression.
+ */
+struct TermReference : public MessageReference {
+    using MessageReference::MessageReference;
+    // If optional is None, then parentheses weren't present
+    // FIXME: Maybe the parser should separate named from positional arguments
+    std::optional<std::vector<Argument>> arguments;
+
+  public:
+    TermReference(std::string &&identifier, std::optional<std::string> &&attribute,
+                  std::optional<std::vector<Argument>> &&arguments)
+        : MessageReference(std::move(identifier), std::move(attribute)),
+          arguments(std::move(arguments)) {}
+
+#ifdef TEST
+    boost::property_tree::ptree getPropertyTree() const override;
+    std::string getPropertyTreeType() const override { return "TermReference"; }
+#endif
+};
+
+/**
  *  \typedef Variable
  *  \brief data which may be passed as an argument when formatting messages.
  */
@@ -195,10 +228,6 @@ struct SelectExpression {
     boost::property_tree::ptree getPropertyTree() const;
 #endif
 };
-
-typedef std::variant<std::string, StringLiteral, NumberLiteral, VariableReference,
-                     MessageReference, TermReference, SelectExpression>
-    PatternElement;
 
 /**
  * \class Comment

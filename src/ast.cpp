@@ -407,9 +407,10 @@ const std::string formatPattern(
                         values << "unknown message " << arg;
                     }
                 } else if constexpr (std::is_same_v<T, TermReference>) {
-                    // FIXME: TermReferences can also have arguments
                     auto term = termLookup(arg.identifier);
                     if (term) {
+                        // FIXME: If argument list is present, turn it into an argument
+                        // dictionary
                         if (arg.attribute) {
                             std::optional<Attribute> attribute =
                                 term->getAttribute(*arg.attribute);
@@ -455,8 +456,7 @@ const std::string Message::format(
 namespace pt = boost::property_tree;
 
 boost::property_tree::ptree MessageReference::getPropertyTree() const {
-    pt::ptree root, expression, id, attribute;
-    root.put("type", "Placeable");
+    pt::ptree expression, id, attribute;
     expression.put("type", this->getPropertyTreeType());
     id.put("type", "Identifier");
     id.put("name", this->identifier);
@@ -468,13 +468,100 @@ boost::property_tree::ptree MessageReference::getPropertyTree() const {
     } else {
         expression.put("attribute", "null");
     }
-    root.add_child("expression", expression);
-    return root;
+    return expression;
+}
+
+pt::ptree getNumberLiteralPropertyTree(const ast::NumberLiteral &literal) {
+    pt::ptree expression;
+    expression.put("value", literal.value);
+    expression.put("type", "NumberLiteral");
+    return expression;
+}
+
+pt::ptree getStringLiteralPropertyTree(const ast::StringLiteral &literal) {
+    pt::ptree expression;
+    expression.put("value", literal.value);
+    expression.put("type", "StringLiteral");
+    return expression;
+}
+
+pt::ptree getInlineExpressionPropertyTree(const PatternElement &pattern) {
+    pt::ptree result;
+    std::visit(
+        [&](const auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                throw std::runtime_error(
+                    "Unexpected TextElement in an InlineExpression!");
+            } else if constexpr (std::is_same_v<T, StringLiteral>) {
+                result = getStringLiteralPropertyTree(arg);
+            } else if constexpr (std::is_same_v<T, NumberLiteral>) {
+                result = getNumberLiteralPropertyTree(arg);
+            } else if constexpr (std::is_same_v<T, VariableReference>) {
+                pt::ptree expression, id;
+                expression.put("type", "VariableReference");
+                id.put("type", "Identifier");
+                id.put("name", arg.identifier);
+                expression.add_child("id", id);
+                result = expression;
+            } else {
+                result = arg.getPropertyTree();
+            }
+        },
+        pattern);
+    return result;
 }
 
 boost::property_tree::ptree TermReference::getPropertyTree() const {
     pt::ptree root = MessageReference::getPropertyTree();
-    root.put("arguments", "null");
+    pt::ptree arguments;
+    if (this->arguments) {
+        pt::ptree positional, named;
+        arguments.put("type", "CallArguments");
+        for (auto elem : *(this->arguments)) {
+            std::visit(
+                [&](const auto &arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, ast::NamedArgument>) {
+                        pt::ptree argument, id;
+                        argument.put("type", "NamedArgument");
+                        id.put("type", "Identifier");
+                        id.put("name", arg.identifier);
+                        argument.add_child("id", id);
+                        std::visit(
+                            [&](const auto &arg) {
+                                using T = std::decay_t<decltype(arg)>;
+                                if constexpr (std::is_same_v<T, ast::NumberLiteral>) {
+                                    argument.add_child(
+                                        "value", getNumberLiteralPropertyTree(arg));
+                                } else if constexpr (std::is_same_v<
+                                                         T, ast::StringLiteral>) {
+                                    argument.add_child(
+                                        "value", getStringLiteralPropertyTree(arg));
+                                }
+                            },
+                            arg.value);
+                        named.push_back(std::make_pair("", argument));
+                    } else {
+                        named.push_back(
+                            std::make_pair("", getInlineExpressionPropertyTree(arg)));
+                    }
+                },
+                elem);
+        }
+        arguments.add_child("positional", positional);
+        arguments.add_child("named", named);
+        root.add_child("arguments", arguments);
+    } else {
+        root.put("arguments", "null");
+    }
+    return root;
+}
+
+pt::ptree wrapPlaceable(const pt::ptree ptree) {
+    pt::ptree root;
+    root.put("type", "Placeable");
+    root.add_child("expression", ptree);
     return root;
 }
 
@@ -490,38 +577,10 @@ pt::ptree getPatternPropertyTree(const std::vector<PatternElement> &pattern) {
                     textElem.put("type", "TextElement");
                     textElem.put("value", arg);
                     elements.push_back(std::make_pair("", textElem));
-                } else if constexpr (std::is_same_v<T, StringLiteral>) {
-                    pt::ptree stringElem, expression;
-                    stringElem.put("type", "Placeable");
-                    expression.put("value", arg.value);
-                    expression.put("type", "StringLiteral");
-                    stringElem.add_child("expression", expression);
-                    elements.push_back(std::make_pair("", stringElem));
-                } else if constexpr (std::is_same_v<T, NumberLiteral>) {
-                    pt::ptree stringElem, expression;
-                    stringElem.put("type", "Placeable");
-                    expression.put("value", arg.value);
-                    expression.put("type", "NumberLiteral");
-                    stringElem.add_child("expression", expression);
-                    elements.push_back(std::make_pair("", stringElem));
-
-                } else if constexpr (std::is_same_v<T, VariableReference>) {
-                    pt::ptree varElem, expression, id;
-                    varElem.put("type", "Placeable");
-                    expression.put("type", "VariableReference");
-                    id.put("type", "Identifier");
-                    id.put("name", arg.identifier);
-                    expression.add_child("id", id);
-                    varElem.add_child("expression", expression);
-                    elements.push_back(std::make_pair("", varElem));
-                } else if constexpr (std::is_same_v<T, MessageReference>) {
-                    elements.push_back(std::make_pair("", arg.getPropertyTree()));
-                } else if constexpr (std::is_same_v<T, TermReference>) {
-                    elements.push_back(std::make_pair("", arg.getPropertyTree()));
-                } else if constexpr (std::is_same_v<T, SelectExpression>) {
-                    elements.push_back(std::make_pair("", arg.getPropertyTree()));
-                } else
-                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                } else {
+                    elements.push_back(std::make_pair(
+                        "", wrapPlaceable(getInlineExpressionPropertyTree(arg))));
+                }
             },
             elem);
     }
@@ -575,8 +634,7 @@ boost::property_tree::ptree Message::getPropertyTree() const {
 }
 
 pt::ptree SelectExpression::getPropertyTree() const {
-    pt::ptree root, expression;
-    root.put("type", "Placeable");
+    pt::ptree expression;
     expression.put("type", "SelectExpression");
     pt::ptree selector =
         getPatternPropertyTree(this->selector).get_child("elements").back().second;
@@ -608,8 +666,7 @@ pt::ptree SelectExpression::getPropertyTree() const {
         variants.push_back(std::make_pair("", varTree));
     }
     expression.add_child("variants", variants);
-    root.add_child("expression", expression);
-    return root;
+    return expression;
 }
 
 void processEntry(pt::ptree &parent, fluent::ast::Entry &entry) {

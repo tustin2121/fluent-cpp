@@ -178,32 +178,6 @@ struct block_text : lexy::token_production {
         });
 };
 
-struct VariableReference : lexy::token_production {
-    static constexpr auto rule = dsl::lit_c<'$'> >> dsl::p<Identifier>;
-    static constexpr auto value = lexy::construct<ast::VariableReference>;
-};
-
-// AttributeAccessor   ::= "." Identifier
-struct AttributeAccessor {
-    static constexpr auto rule = dsl::lit_c<'.'> >> dsl::p<Identifier>;
-    static constexpr auto value = lexy::forward<std::string>;
-};
-
-// MessageReference    ::= Identifier AttributeAccessor?
-struct MessageReference : lexy::token_production {
-    static constexpr auto rule = dsl::p<Identifier> >>
-                                 dsl::opt(dsl::p<AttributeAccessor>);
-    static constexpr auto value = lexy::construct<ast::MessageReference>;
-};
-
-// TermReference       ::= "-" Identifier AttributeAccessor? CallArguments?
-struct TermReference : lexy::token_production {
-    // FIXME: Add arguments
-    static constexpr auto rule = dsl::lit_c<'-'> >> dsl::p<Identifier> >>
-                                 dsl::opt(dsl::p<AttributeAccessor>);
-    static constexpr auto value = lexy::construct<ast::TermReference>;
-};
-
 // NumberLiteral       ::= "-"? digits ("." digits)?
 struct NumberLiteral : lexy::token_production {
     static constexpr auto rule = [] {
@@ -233,8 +207,76 @@ struct StringLiteral : lexy::token_production {
                                   lexy::construct<ast::StringLiteral>;
 };
 
+struct VariableReference : lexy::token_production {
+    static constexpr auto rule = dsl::lit_c<'$'> >> dsl::p<Identifier>;
+    static constexpr auto value = lexy::construct<ast::VariableReference>;
+};
+
+// AttributeAccessor   ::= "." Identifier
+struct AttributeAccessor {
+    static constexpr auto rule = dsl::lit_c<'.'> >> dsl::p<Identifier>;
+    static constexpr auto value = lexy::forward<std::string>;
+};
+
+// NamedArgument       ::= Identifier blank? ":" blank? (StringLiteral | NumberLiteral)
+struct NamedArgument {
+    static constexpr auto rule = [] {
+        // The Identifier by itself can't be disambiguated from a MessageReference,
+        // which is also a valid member of the ArgumentList
+        auto prefix = dsl::p<Identifier> + opt_blank + dsl::colon;
+        return dsl::peek(prefix) >>
+               prefix + opt_blank + (dsl::p<StringLiteral> | dsl::p<NumberLiteral>);
+    }();
+    static constexpr auto value = lexy::construct<ast::NamedArgument>;
+};
+
+struct InlineExpression;
+
+struct Argument {
+    static constexpr auto rule =
+        dsl::p<NamedArgument> | dsl::else_ >> dsl::recurse<InlineExpression>;
+    static constexpr auto value = lexy::construct<ast::Argument>;
+};
+
+// Argument            ::= NamedArgument | InlineExpression
+// argument_list       ::= (Argument blank? "," blank?)* Argument?
+struct ArgumentList {
+    static constexpr auto rule = [] {
+        auto sep = dsl::sep(dsl::peek(opt_blank + dsl::comma) >>
+                            opt_blank + dsl::comma + opt_blank);
+        return dsl::list(dsl::p<Argument>, sep);
+    }();
+    static constexpr auto value = lexy::as_list<std::vector<ast::Argument>>;
+};
+
+// CallArguments       ::= blank? "(" blank? argument_list blank? ")"
+struct CallArguments {
+    static constexpr auto rule = [] {
+        auto prefix = opt_blank + dsl::lit_c<'('>;
+        return dsl::peek(prefix) >>
+               prefix + opt_blank + dsl::p<ArgumentList> + opt_blank + dsl::lit_c<')'>;
+    }();
+    static constexpr auto value = lexy::forward<std::vector<ast::Argument>>;
+};
+
+// MessageReference    ::= Identifier AttributeAccessor?
+struct MessageReference : lexy::token_production {
+    static constexpr auto rule = dsl::p<Identifier> >>
+                                 dsl::opt(dsl::p<AttributeAccessor>);
+    static constexpr auto value = lexy::construct<ast::MessageReference>;
+};
+
+// TermReference       ::= "-" Identifier AttributeAccessor? CallArguments?
+struct TermReference : lexy::token_production {
+    static constexpr auto
+        rule = dsl::lit_c<'-'> >> dsl::p<Identifier> >>
+               dsl::opt(dsl::p<AttributeAccessor>) + dsl::opt(dsl::p<CallArguments>);
+    static constexpr auto value = lexy::construct<ast::TermReference>;
+};
+
 struct inline_placeable;
 
+// FIXME: Attributes of terms cannot be used as placeables
 // InlineExpression    ::= StringLiteral | NumberLiteral | FunctionReference |
 // MessageReference | TermReference | VariableReference | inline_placeable
 struct InlineExpression {
