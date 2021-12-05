@@ -8,8 +8,8 @@ find_package(ICU COMPONENTS uc i18n REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
     lexy
-    URL https://github.com/foonathan/lexy/archive/2bb701a.zip
-    URL_HASH MD5=bfde035bbd5e5e12809f4a29ab74edb8
+    URL https://github.com/foonathan/lexy/archive/c81207d.zip
+    URL_HASH MD5=e8fb2d1a0686b9d1ee10d42e51ff1515
     SOURCE_DIR lexy
 )
 FetchContent_MakeAvailable(lexy)
