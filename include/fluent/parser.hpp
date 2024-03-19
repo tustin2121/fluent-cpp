@@ -22,20 +22,19 @@
  *  \brief Parsing of fluent resources from raw data
  */
 
-#ifndef PARSER_HPP_INCLUDED
-#define PARSER_HPP_INCLUDED
+#ifndef _FLUENT_PARSER_HPP_
+#define _FLUENT_PARSER_HPP_
 
 #include "fluent/ast.hpp"
 #include <filesystem>
 #include <vector>
 
 namespace fluent {
-// Fixme: return a map instead of a vector
-std::vector<ast::Entry> parseFile(const std::filesystem::path &file,
-                                  bool strict = false);
-std::vector<ast::Entry> parse(std::string &&contents, bool strict = false);
-std::vector<ast::PatternElement> parsePattern(const std::string &input);
-ast::MessageReference parseMessageReference(const std::string &input);
+    // Fixme: return a map instead of a vector
+    std::vector<ast::Entry> parseFile(const std::filesystem::path& file, bool strict = false);
+    std::vector<ast::Entry> parse(std::string&& contents, bool strict = false);
+    std::vector<ast::PatternElement> parsePattern(const std::string& input);
+    ast::MessageReference parseMessageReference(const std::string& input);
 } // namespace fluent
 
-#endif // PARSER_HPP_INCLUDED
+#endif

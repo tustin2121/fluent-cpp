@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
 
     output << "#include <fluent/loader.hpp>" << std::endl;
     output << "#include <unicode/locid.h>" << std::endl;
-    output << "#include <unicode/locid.h>" << std::endl;
 
     output << "static char ftl_data[] = {";
 

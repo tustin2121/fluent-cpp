@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "./.build/lexy/include"
+            ],
+            "defines": [
+                "Q_OS_UNIX",
+                "__VSCODE_INTELLISENSE_CRASH_PATCH__" // https://github.com/microsoft/vscode-cpptools/issues/9254
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-clang-x64"
+            // "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

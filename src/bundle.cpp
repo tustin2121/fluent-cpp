@@ -21,31 +21,30 @@
 
 namespace fluent {
 
-void FluentBundle::addMessage(ast::Message &&message) {
-    this->messages.insert(std::make_pair(message.getId(), message));
-}
-
-void FluentBundle::addTerm(ast::Term &&term) {
-    this->terms.insert(std::make_pair(term.getId(), term));
-}
-
-std::optional<ast::Message>
-FluentBundle::getMessage(const std::string &identifier) const {
-    auto result = this->messages.find(identifier);
-    if (result != this->messages.end()) {
-        return std::optional(result->second);
-    } else {
-        return std::optional<ast::Message>();
+    void FluentBundle::addMessage(ast::Message&& message) {
+        this->messages.insert(std::make_pair(message.getId(), message));
     }
-}
 
-std::optional<ast::Term> FluentBundle::getTerm(const std::string &identifier) const {
-    auto result = this->terms.find(identifier);
-    if (result != this->terms.end()) {
-        return std::optional(result->second);
-    } else {
-        return std::optional<ast::Term>();
+    void FluentBundle::addTerm(ast::Term&& term) {
+        this->terms.insert(std::make_pair(term.getId(), term));
     }
-}
+
+    std::optional<ast::Message> FluentBundle::getMessage(const std::string& identifier) const {
+        auto result = this->messages.find(identifier);
+        if (result != this->messages.end()) {
+            return std::optional(result->second);
+        } else {
+            return std::optional<ast::Message>();
+        }
+    }
+
+    std::optional<ast::Term> FluentBundle::getTerm(const std::string& identifier) const {
+        auto result = this->terms.find(identifier);
+        if (result != this->terms.end()) {
+            return std::optional(result->second);
+        } else {
+            return std::optional<ast::Term>();
+        }
+    }
 
 } // namespace fluent
